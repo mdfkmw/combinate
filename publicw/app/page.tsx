@@ -349,9 +349,6 @@ export default function Page() {
             const exitLocationParts = parseLocationLabel(exitLocationLabel)
             const boardSubtitle = boardTime ? `Stație urcare · ${boardTime}` : 'Stație urcare'
             const exitSubtitle = exitTime ? `Stație coborâre · ${exitTime}` : 'Stație coborâre'
-            const blockMessage = !trip.can_book
-              ? trip.block_reason ?? 'Momentan nu poți rezerva online această cursă.'
-              : null;
 
             return (
               <article key={trip.trip_id} className="trip-card overflow-hidden">
@@ -442,9 +439,6 @@ export default function Page() {
                         <div className="text-3xl font-extrabold">{formatPrice(trip.price, trip.currency)}</div>
                       </div>
                       <div className="text-xs text-white/70">per loc</div>
-                      {blockMessage && (
-                        <p className="text-xs text-white/60">{blockMessage}</p>
-                      )}
                       <button
                         className="btn-primary w-full"
                         onClick={() => handleReserve(trip)}
