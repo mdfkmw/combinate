@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Navbar from '@/components/Navbar'
 import SearchCard, { type SearchValues } from '@/components/SearchCard'
 import SeatModal from '@/components/SeatModal'
@@ -74,6 +74,8 @@ export default function Page() {
   const [activeTrip, setActiveTrip] = useState<ExtendedTrip | null>(null)
   const [feedback, setFeedback] = useState<FeedbackState>(null)
   const [mapPreview, setMapPreview] = useState<MapPreviewData | null>(null)
+  const [searchTrigger, setSearchTrigger] = useState(0)
+  const resultsRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     let ignore = false
@@ -149,10 +151,36 @@ export default function Page() {
   const handleSearch = async (values: SearchValues) => {
     setFeedback(null)
     setSearchValues(values)
+    setSearchTrigger((value) => value + 1)
     await performSearch(values)
   }
 
+  useEffect(() => {
+    if (tripsLoading || !searchValues) {
+      return
+    }
+
+    if (typeof window === 'undefined') {
+      return
+    }
+
+    const isMobile = window.matchMedia('(max-width: 768px)').matches
+    if (!isMobile) {
+      return
+    }
+
+    const target = resultsRef.current
+    if (!target) {
+      return
+    }
+
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [tripsLoading, searchValues, searchTrigger])
+
   const handleReserve = (trip: ExtendedTrip) => {
+    if (!trip.can_book || trip.block_reason) {
+      return;
+    }
     setActiveTrip(trip)
     setOpen(true)
   }
@@ -274,7 +302,11 @@ export default function Page() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-4 mt-10 md:mt-12" id="rezervari">
+      <section
+        className="max-w-6xl mx-auto px-4 mt-10 md:mt-12"
+        id="rezervari"
+        ref={resultsRef}
+      >
         <div className="flex items-center justify-between flex-wrap gap-3">
           <h2 className="text-2xl md:text-3xl font-bold">Rezultatele căutării</h2>
           {searchValues && (
@@ -349,6 +381,11 @@ export default function Page() {
             const exitLocationParts = parseLocationLabel(exitLocationLabel)
             const boardSubtitle = boardTime ? `Stație urcare · ${boardTime}` : 'Stație urcare'
             const exitSubtitle = exitTime ? `Stație coborâre · ${exitTime}` : 'Stație coborâre'
+            const isBlocked = !trip.can_book || !!trip.block_reason
+            const blockMessage = isBlocked
+              ? trip.block_reason ?? 'Momentan nu poți rezerva online această cursă.'
+              : null
+            const canReserveTrip = !isBlocked
 
             return (
               <article key={trip.trip_id} className="trip-card overflow-hidden">
@@ -439,12 +476,15 @@ export default function Page() {
                         <div className="text-3xl font-extrabold">{formatPrice(trip.price, trip.currency)}</div>
                       </div>
                       <div className="text-xs text-white/70">per loc</div>
+                      {blockMessage && (
+                        <p className="text-xs text-white/60">{blockMessage}</p>
+                      )}
                       <button
                         className="btn-primary w-full"
                         onClick={() => handleReserve(trip)}
-                        disabled={!trip.can_book}
+                        disabled={!canReserveTrip}
                       >
-                        {trip.can_book ? 'Alege locuri' : 'Indisponibil'}
+                        {canReserveTrip ? 'Alege locuri' : 'Indisponibil'}
                       </button>
                     </div>
                   </div>
