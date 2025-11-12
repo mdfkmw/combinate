@@ -6,6 +6,7 @@ const router = express.Router();
 
 const { requireAuth, requireRole } = require('../middleware/auth');
 const { normalizeDirection, isReturnDirection, ensureDirection } = require('../utils/direction');
+const { getOnlineSettings, buildDateTimeFromDateAndTime } = require('../utils/onlineSettings');
 
 // ✅ Acces pentru rutele interne (admin, operator_admin, agent, driver)
 router.use(['/', '/:id'], (req, res, next) => {
@@ -635,6 +636,7 @@ router.post('/', async (req, res) => {
   }
 
   try {
+    const onlineSettings = await getOnlineSettings();
     const scheduleInfo = await resolveSchedule(route_id, {
       scheduleId,
       time: timeValue,
@@ -654,6 +656,15 @@ router.post('/', async (req, res) => {
 
     if (!canonicalTime) {
       return abortWithError(400, { error: 'Ora plecării nu a putut fi determinată' });
+    }
+
+    if (onlineSettings?.blockPastReservations && hasNewPassengers) {
+      const tripDateTime = buildDateTimeFromDateAndTime(date, canonicalTime);
+      if (tripDateTime && tripDateTime.getTime() < Date.now()) {
+        return abortWithError(409, {
+          error: 'Nu poți crea rezervări noi pentru curse care au plecat deja.',
+        });
+      }
     }
 
     // 1) stațiile rutei
