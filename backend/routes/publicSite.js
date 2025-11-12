@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require('../db');
 const { normalizeDirection, isReturnDirection } = require('../utils/direction');
 const { ensureIntentOwner } = require('../utils/intentOwner');
+const { getOnlineSettings, buildDateTimeFromDateAndTime } = require('../utils/onlineSettings');
 const { requirePublicAuth } = require('../middleware/publicAuth');
 
 const PUBLIC_CATEGORY_CANDIDATES = (() => {
@@ -50,6 +51,35 @@ function sanitizeDate(dateStr) {
 function sanitizePhone(raw) {
   if (!raw) return '';
   return String(raw).replace(/\D/g, '').slice(0, 20);
+}
+
+function formatAdvanceLimit(minutes) {
+  const totalMinutes = Number(minutes);
+  if (!Number.isFinite(totalMinutes) || totalMinutes <= 0) {
+    return '0 minute';
+  }
+
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const remainingMinutes = Math.floor(totalMinutes % 60);
+
+  const parts = [];
+  if (days > 0) {
+    parts.push(`${days} ${days === 1 ? 'zi' : 'zile'}`);
+  }
+  if (hours > 0) {
+    parts.push(`${hours} ${hours === 1 ? 'oră' : 'ore'}`);
+  }
+
+  if (remainingMinutes > 0) {
+    parts.push(`${remainingMinutes} minute`);
+  }
+
+  if (parts.length === 0) {
+    parts.push('sub o oră');
+  }
+
+  return parts.join(' și ');
 }
 
 function buildPhoneVariants(raw) {
@@ -1080,6 +1110,8 @@ router.get('/trips', async (req, res) => {
     );
 
     const results = [];
+    const onlineSettings = await getOnlineSettings();
+    const nowTs = Date.now();
     for (const trip of rows) {
       const seatInfo = await computeSeatAvailability(db, {
         tripId: trip.trip_id,
@@ -1114,7 +1146,39 @@ router.get('/trips', async (req, res) => {
 
       const available = Number.isFinite(seatInfo.totalAvailable) ? seatInfo.totalAvailable : null;
       const boardingStarted = Number(seatInfo.trip?.boarding_started) === 1;
-      const canBook = boardingStarted ? false : available == null ? true : available >= Math.max(passengers, 1);
+
+      const tripDateTime = buildDateTimeFromDateAndTime(trip.date, trip.departure_time);
+      const diffMinutes = tripDateTime ? (tripDateTime.getTime() - nowTs) / 60000 : null;
+      const maxAdvanceMinutes = Number(onlineSettings?.publicMaxAdvanceMinutes) || 0;
+      const minNoticeMinutes = Number(onlineSettings?.publicMinNoticeMinutes) || 0;
+      const minPassengerCount = Math.max(passengers, 1);
+
+      let canBook = true;
+      let blockReason = null;
+
+      if (boardingStarted) {
+        canBook = false;
+        blockReason = 'Rezervările online pentru această cursă s-au închis. Îmbarcarea a început deja.';
+      } else if (available != null && available < minPassengerCount) {
+        canBook = false;
+        blockReason =
+          minPassengerCount > 1
+            ? 'Nu mai sunt suficiente locuri disponibile pentru numărul de pasageri selectați.'
+            : 'Nu mai sunt locuri disponibile online pentru această cursă.';
+      }
+
+      if (canBook && onlineSettings?.blockPastReservations && diffMinutes != null && diffMinutes < 0) {
+        canBook = false;
+        blockReason = 'Nu poți face rezervare online pentru că mașina a plecat deja.';
+      }
+      if (canBook && minNoticeMinutes > 0 && diffMinutes != null && diffMinutes < minNoticeMinutes) {
+        canBook = false;
+        blockReason = `Rezervările online se închid cu ${formatAdvanceLimit(minNoticeMinutes)} înainte de plecare.`;
+      }
+      if (canBook && maxAdvanceMinutes > 0 && diffMinutes != null && diffMinutes > maxAdvanceMinutes) {
+        canBook = false;
+        blockReason = `Poți rezerva online cu cel mult ${formatAdvanceLimit(maxAdvanceMinutes)} înainte de plecare.`;
+      }
 
       results.push({
         trip_id: trip.trip_id,
@@ -1130,6 +1194,7 @@ router.get('/trips', async (req, res) => {
         pricing_category_id: priceInfo?.pricing_category_id ?? null,
         available_seats: available,
         can_book: canBook,
+        block_reason: blockReason,
         boarding_started: boardingStarted,
         board_station_id: fromStationId,
         exit_station_id: toStationId,
@@ -1592,6 +1657,8 @@ router.post('/reservations', async (req, res) => {
 
   const { ownerId: intentOwnerId } = ensureIntentOwner(req, res);
 
+  const onlineSettings = await getOnlineSettings();
+  const nowTs = Date.now();
   const conn = await db.getConnection();
   try {
     await conn.beginTransaction();
@@ -1601,6 +1668,42 @@ router.post('/reservations', async (req, res) => {
       await conn.rollback();
       conn.release();
       return res.status(404).json({ error: 'Cursa selectată nu există sau este indisponibilă.' });
+    }
+
+    const tripDateTime = buildDateTimeFromDateAndTime(trip.date, trip.departure_time);
+    const diffMinutes = tripDateTime ? (tripDateTime.getTime() - nowTs) / 60000 : null;
+    const maxAdvanceMinutes = Number(onlineSettings?.publicMaxAdvanceMinutes) || 0;
+
+    if (onlineSettings?.blockPastReservations && diffMinutes != null && diffMinutes < 0) {
+      await conn.rollback();
+      conn.release();
+      return res.status(409).json({
+        error: 'Rezervările online nu sunt disponibile pentru curse care au plecat deja.',
+      });
+    }
+
+    if (
+      onlineSettings?.publicMinNoticeMinutes > 0 &&
+      diffMinutes != null &&
+      diffMinutes < onlineSettings.publicMinNoticeMinutes
+    ) {
+      await conn.rollback();
+      conn.release();
+      return res.status(409).json({
+        error: `Rezervările online se închid cu ${onlineSettings.publicMinNoticeMinutes} minute înainte de plecare.`,
+      });
+    }
+
+    if (
+      maxAdvanceMinutes > 0 &&
+      diffMinutes != null &&
+      diffMinutes > maxAdvanceMinutes
+    ) {
+      await conn.rollback();
+      conn.release();
+      return res.status(409).json({
+        error: `Rezervările online pot fi făcute cu cel mult ${formatAdvanceLimit(maxAdvanceMinutes)} în avans.`,
+      });
     }
 
     if (Number(trip.boarding_started)) {
