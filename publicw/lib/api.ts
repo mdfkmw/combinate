@@ -95,6 +95,7 @@ export interface PublicTrip {
   pricing_category_id: number | null;
   available_seats: number | null;
   can_book: boolean;
+  block_reason?: string | null;
   board_station_id: number;
   exit_station_id: number;
   date: string;

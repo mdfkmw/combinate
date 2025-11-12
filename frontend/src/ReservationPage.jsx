@@ -22,6 +22,13 @@ import ConfirmModal from './components/ConfirmModal';
 import { selectSeats } from './components/reservationLogic';
 
 
+const ONLINE_SETTINGS_DEFAULTS = {
+  blockPastReservations: true,
+  publicMinNoticeMinutes: 0,
+  publicMaxAdvanceMinutes: 0,
+};
+
+
 
 
 
@@ -39,6 +46,9 @@ export default function ReservationPage({ userRole, user }) {
   const bookingChannel = ['admin', 'operator_admin', 'agent'].includes(normalizedRole)
     ? 'agent'
     : 'online';
+
+  const [onlineSettings, setOnlineSettings] = useState(null);
+  const [onlineSettingsLoaded, setOnlineSettingsLoaded] = useState(false);
 
 
   const inFlightPrice = useRef(new Set()); // chei unice pt requesturi de preț aflate în derulare
@@ -59,6 +69,44 @@ export default function ReservationPage({ userRole, user }) {
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
   const selectedSeatsRef = useRef([]);
   const previousSelectionKeyRef = useRef(null);
+  useEffect(() => {
+    let ignore = false;
+    const loadSettings = async () => {
+      try {
+        const res = await fetch('/api/online-settings', { credentials: 'include' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (ignore) return;
+        const rawMaxAdvanceMinutes = Number(
+          data?.publicMaxAdvanceMinutes != null
+            ? data.publicMaxAdvanceMinutes
+            : data?.publicMaxDaysAhead != null
+            ? Number(data.publicMaxDaysAhead) * 24 * 60
+            : 0,
+        );
+        const maxAdvanceMinutes = Number.isFinite(rawMaxAdvanceMinutes)
+          ? Math.max(0, Math.floor(rawMaxAdvanceMinutes))
+          : 0;
+
+        setOnlineSettings({
+          blockPastReservations: !!data?.blockPastReservations,
+          publicMinNoticeMinutes: Number(data?.publicMinNoticeMinutes) || 0,
+          publicMaxAdvanceMinutes: maxAdvanceMinutes,
+        });
+      } catch (err) {
+        if (!ignore) {
+          console.warn('Nu am putut încărca setările online:', err);
+          setOnlineSettings({ ...ONLINE_SETTINGS_DEFAULTS });
+        }
+      } finally {
+        if (!ignore) setOnlineSettingsLoaded(true);
+      }
+    };
+    loadSettings();
+    return () => {
+      ignore = true;
+    };
+  }, []);
   // 👥 Obiect care conține datele fiecărui pasager selectat
   const [passengersData, setPassengersData] = useState({});
   // 💵 Prețurile calculate pentru fiecare loc (seat_id -> price)
@@ -420,6 +468,20 @@ export default function ReservationPage({ userRole, user }) {
   const [vehicleInfo, setVehicleInfo] = useState(null);
   const [selectedTrip, setSelectedTrip] = useState(null);
   const boardingStarted = useMemo(() => Number(selectedTrip?.boarding_started) === 1, [selectedTrip]);
+  const tripDateTime = useMemo(() => {
+    if (!selectedTrip?.date || !selectedTrip?.time) return null;
+    const [year, month, day] = String(selectedTrip.date).split('-').map(Number);
+    const timeParts = String(selectedTrip.time).split(':');
+    const hours = Number(timeParts[0]);
+    const minutes = Number(timeParts[1]);
+    if (![year, month, day, hours, minutes].every((value) => Number.isFinite(value))) return null;
+    return new Date(year, month - 1, day, hours, minutes, 0, 0);
+  }, [selectedTrip?.date, selectedTrip?.time]);
+  const blockNewReservations =
+    !!onlineSettingsLoaded &&
+    !!onlineSettings?.blockPastReservations &&
+    tripDateTime instanceof Date &&
+    tripDateTime.getTime() < Date.now();
   const [moveSourceSeat, setMoveSourceSeat] = useState(null);
   const [paying, setPaying] = useState(false);
   const lastSelectedSeatIdsRef = useRef([]);
@@ -2217,6 +2279,12 @@ export default function ReservationPage({ userRole, user }) {
 
   // salvează cu verificare + efecte vizuale dacă lipsesc câmpuri
   const handleStartSave = () => {
+    if (blockNewReservations) {
+      setToastMessage('Nu poți salva rezervări pentru curse care au plecat deja.');
+      setToastType('error');
+      setTimeout(() => setToastMessage(''), 3000);
+      return;
+    }
     // validează fiecare pasager selectat folosind utilitarul existent
     const invalidSeatIds = selectedSeats
       .filter(seat => {
@@ -2259,6 +2327,12 @@ export default function ReservationPage({ userRole, user }) {
 
 
   const handleSaveReservation = async () => {
+    if (blockNewReservations) {
+      setToastMessage('Nu poți salva rezervări pentru curse care au plecat deja.');
+      setToastType('error');
+      setTimeout(() => setToastMessage(''), 3000);
+      return;
+    }
     // 1) verificăm conflicte same-day, same-direction, altă oră
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const firstSeatId = selectedSeats[0]?.id;
@@ -3034,6 +3108,11 @@ export default function ReservationPage({ userRole, user }) {
                     Îmbarcarea a început pentru această cursă. Nu se mai pot face rezervări noi din aplicația internă.
                   </div>
                 )}
+                {!boardingStarted && onlineSettingsLoaded && blockNewReservations && (
+                  <div className="mb-4 rounded-md border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Rezervările noi nu sunt disponibile pentru curse care au plecat deja.
+                  </div>
+                )}
 
                 {selectedHour && (
                   <div className="mb-4 flex items-center border-b space-x-4">
@@ -3664,10 +3743,16 @@ export default function ReservationPage({ userRole, user }) {
 
                     <button
                       onClick={handleStartSave}
-                      disabled={isSaving || boardingStarted}
-                      title={boardingStarted ? 'Îmbarcarea a început – nu se mai pot salva rezervări noi.' : undefined}
+                      disabled={isSaving || boardingStarted || blockNewReservations}
+                      title={
+                        boardingStarted
+                          ? 'Îmbarcarea a început – nu se mai pot salva rezervări noi.'
+                          : blockNewReservations
+                            ? 'Nu poți salva rezervări pentru curse care au plecat deja.'
+                            : undefined
+                      }
                       className={`px-6 py-2 rounded text-white transition ${
-                        (isSaving || boardingStarted)
+                        (isSaving || boardingStarted || blockNewReservations)
                           ? 'bg-gray-300 cursor-not-allowed text-gray-600'
                           : 'bg-green-600 hover:bg-green-700'
                       }`}
