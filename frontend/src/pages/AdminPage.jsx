@@ -11,7 +11,6 @@ import AdminDisabledSchedules from './AdminDisabledSchedules';
 import AdminVehicles from "./AdminVehicles";
 import UserPreferences from './UserPreferences';
 import AdminFiscalSettings from './AdminFiscalSettings';
-import AdminOnlineSettings from './AdminOnlineSettings';
 
 export default function AdminPage() {
   const [tab, setTab] = useState('drivers');
@@ -71,7 +70,6 @@ export default function AdminPage() {
                 {tabButton('vehicles', 'Mașini')}
                 {tabButton('promo', 'Coduri promo')}
                 {tabButton('fiscal', 'Fiscalizare')}
-                {tabButton('online', 'Online')}
               </>
             )}
           </div>
@@ -90,7 +88,6 @@ export default function AdminPage() {
               {tab === 'vehicles'   && <AdminVehicles />}
               {tab === 'promo'      && <AdminPromoCodes />}
               {tab === 'fiscal'     && <AdminFiscalSettings />}
-              {tab === 'online'     && <AdminOnlineSettings />}
             </>
           )}
         </>
