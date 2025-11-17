@@ -66,12 +66,9 @@ export default function ReservationPage({ userRole, user }) {
   // 💺 Locurile selectate în diagrama autobuzului
   const [selectedSeats, setSelectedSeats] = useState([]);
   const [seatViewMode, setSeatViewMode] = useState('grid');
-  const [isWideView, setIsWideView] = useState(false);
-  const [isExportingSeatMap, setIsExportingSeatMap] = useState(false);
   const [isTimelineModalOpen, setIsTimelineModalOpen] = useState(false);
   const selectedSeatsRef = useRef([]);
   const previousSelectionKeyRef = useRef(null);
-  const seatMapRef = useRef(null);
   useEffect(() => {
     let ignore = false;
     const loadSettings = async () => {
@@ -585,8 +582,6 @@ export default function ReservationPage({ userRole, user }) {
   const autoSelectEnabled = false;
   // 🧭 Toate locurile disponibile pentru vehiculul curent
   const [seats, setSeats] = useState([]);
-  const isGridViewActive = seatViewMode === 'grid';
-  const exportButtonsDisabled = !isGridViewActive || seats.length === 0 || isExportingSeatMap;
   // 🛣️ Lista rutelor disponibile din baza de date
   const [routesList, setRoutesList] = useState([]);
 
@@ -649,12 +644,6 @@ export default function ReservationPage({ userRole, user }) {
     intentsRef.current = intentHolds;
   }, [intentHolds]);
 
-  useEffect(() => {
-    if (seatViewMode !== 'grid' && isWideView) {
-      setIsWideView(false);
-    }
-  }, [seatViewMode, isWideView]);
-
   const [popupPassenger, setPopupPassenger] = useState(null);
   const [popupSeat, setPopupSeat] = useState(null);
   const [popupPosition, setPopupPosition] = useState(null);
@@ -668,232 +657,6 @@ export default function ReservationPage({ userRole, user }) {
   const [passengers, setPassengers] = useState([]);
   const [showMoveToOtherTrip, setShowMoveToOtherTrip] = useState(false);
   const [moveToOtherTripData, setMoveToOtherTripData] = useState(null);
-
-  const drawSeatMapCanvas = useCallback(() => {
-    if (!Array.isArray(seats) || seats.length === 0) {
-      return null;
-    }
-
-    const seatWidth = isWideView ? 210 : 105;
-    const seatHeight = 100;
-    const seatGap = 5;
-    const padding = 24;
-    const seatPadding = 10;
-    const maxCol = Math.max(...seats.map((s) => s.seat_col || 1));
-    const maxRow = Math.max(...seats.map((s) => s.row || 0));
-    const totalWidth = seatWidth * maxCol + seatGap * (maxCol - 1) + padding * 2;
-    const totalHeight = seatHeight * (maxRow + 1) + seatGap * maxRow + padding * 2;
-    const canvas = document.createElement('canvas');
-    canvas.width = totalWidth;
-    canvas.height = totalHeight;
-    const ctx = canvas.getContext('2d');
-
-    if (!ctx) {
-      return null;
-    }
-
-    ctx.fillStyle = '#f3f4f6';
-    ctx.fillRect(0, 0, totalWidth, totalHeight);
-    ctx.textBaseline = 'top';
-    ctx.textAlign = 'left';
-
-    const selectedSeatIds = new Set(selectedSeats.map((seat) => seat.id));
-    const textWidthLimit = seatWidth - seatPadding * 2;
-
-    const clampText = (value, font) => {
-      if (!value) return '';
-      const ellipsis = '…';
-      ctx.font = font;
-      if (ctx.measureText(value).width <= textWidthLimit) {
-        return value;
-      }
-      let truncated = value;
-      while (truncated.length > 1 && ctx.measureText(truncated + ellipsis).width > textWidthLimit) {
-        truncated = truncated.slice(0, -1);
-      }
-      return `${truncated}${ellipsis}`;
-    };
-
-    const drawRoundedRect = (context, x, y, width, height, radius = 12) => {
-      const r = Math.min(radius, width / 2, height / 2);
-      context.beginPath();
-      context.moveTo(x + r, y);
-      context.lineTo(x + width - r, y);
-      context.quadraticCurveTo(x + width, y, x + width, y + r);
-      context.lineTo(x + width, y + height - r);
-      context.quadraticCurveTo(x + width, y + height, x + width - r, y + height);
-      context.lineTo(x + r, y + height);
-      context.quadraticCurveTo(x, y + height, x, y + height - r);
-      context.lineTo(x, y + r);
-      context.quadraticCurveTo(x, y, x + r, y);
-      context.closePath();
-    };
-
-    const baseColors = {
-      driver: '#4b5563',
-      full: '#dc2626',
-      held: '#f97316',
-      partial: '#eab308',
-      selected: '#3b82f6',
-      available: '#22c55e',
-    };
-
-    seats.forEach((seat) => {
-      const col = (seat.seat_col || 1) - 1;
-      const row = seat.row || 0;
-      const x = padding + col * (seatWidth + seatGap);
-      const y = padding + row * (seatHeight + seatGap);
-      const lowerLabel = (seat.label || '').toLowerCase();
-      const isDriverSeat = lowerLabel.includes('șofer') || seat.label === 'Șofer' || seat.label === 'Ghid';
-      const status = seat.status;
-      const holdInfo = intentHolds?.[seat.id];
-      const heldByOther = holdInfo?.isMine === false;
-      const heldByMe = holdInfo?.isMine === true;
-      const isSelected = selectedSeatIds.has(seat.id);
-      const isMoveSource = moveSourceSeat?.id === seat.id;
-
-      let fillColor = baseColors.available;
-      if (isDriverSeat) {
-        fillColor = baseColors.driver;
-      } else if (status === 'full') {
-        fillColor = baseColors.full;
-      } else if (heldByOther) {
-        fillColor = baseColors.held;
-      } else if (status === 'partial') {
-        fillColor = baseColors.partial;
-      } else if (isSelected || heldByMe) {
-        fillColor = baseColors.selected;
-      }
-
-      drawRoundedRect(ctx, x, y, seatWidth, seatHeight, 18);
-      ctx.fillStyle = fillColor;
-      ctx.fill();
-
-      if (isSelected || isMoveSource) {
-        ctx.lineWidth = 4;
-        ctx.strokeStyle = isMoveSource ? '#facc15' : '#fef3c7';
-        ctx.stroke();
-      }
-
-      const activePassengers = (seat.passengers || []).filter((p) => !p.status || p.status === 'active');
-      const primaryPassenger = activePassengers[0];
-      let textY = y + seatPadding;
-      const writeLine = (text, font = '12px "Inter", sans-serif') => {
-        if (!text) return;
-        const value = clampText(String(text), font);
-        ctx.font = font;
-        ctx.fillStyle = '#ffffff';
-        ctx.fillText(value, x + seatPadding, textY);
-        textY += 16;
-      };
-
-      writeLine(seat.label, '600 14px "Inter", sans-serif');
-      if (primaryPassenger) {
-        writeLine(primaryPassenger.name || '(fără nume)', '600 13px "Inter", sans-serif');
-        writeLine(primaryPassenger.phone, '12px "Inter", sans-serif');
-        writeLine(`${primaryPassenger.board_at} → ${primaryPassenger.exit_at}`, '12px "Inter", sans-serif');
-      }
-
-      if (activePassengers.length > 1) {
-        textY += 4;
-        activePassengers.slice(1).forEach((passenger) => {
-          writeLine(passenger.name, '600 12px "Inter", sans-serif');
-          writeLine(passenger.phone, '12px "Inter", sans-serif');
-        });
-      }
-
-      const paidPassenger = activePassengers.find((p) => p?.payment_status === 'paid');
-      const paymentMethod = paidPassenger?.payment_method || primaryPassenger?.payment_method;
-      if (paymentMethod) {
-        const methodLabel = paymentMethod === 'cash' ? '💵 Cash' : paymentMethod === 'card' ? '💳 Card' : '📝 Rezervare';
-        ctx.font = '600 11px "Inter", sans-serif';
-        const badgeWidth = ctx.measureText(methodLabel).width + 16;
-        const badgeHeight = 20;
-        const badgeX = x + seatWidth - badgeWidth - seatPadding;
-        const badgeY = y + seatHeight - badgeHeight - seatPadding;
-        const badgeColor = paymentMethod === 'cash' ? '#eab308' : paymentMethod === 'card' ? '#7c3aed' : '#6b7280';
-        drawRoundedRect(ctx, badgeX, badgeY, badgeWidth, badgeHeight, 10);
-        ctx.fillStyle = badgeColor;
-        ctx.fill();
-        ctx.fillStyle = '#ffffff';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText(methodLabel, badgeX + badgeWidth / 2, badgeY + badgeHeight / 2 + 1);
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'top';
-      }
-
-      if (heldByOther) {
-        ctx.fillStyle = 'rgba(0,0,0,0.45)';
-        ctx.fillRect(x, y, seatWidth, seatHeight);
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '600 12px "Inter", sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText('Rezervare în curs', x + seatWidth / 2, y + seatHeight / 2 - 6);
-        ctx.textAlign = 'left';
-      }
-    });
-
-    return canvas;
-  }, [intentHolds, isWideView, moveSourceSeat, seats, selectedSeats]);
-
-  const handleSeatMapExport = useCallback(
-    async (format = 'png') => {
-      if (seatViewMode !== 'grid') {
-        setToastMessage('Exportul este disponibil doar în diagrama clasică.');
-        setToastType('warning');
-        setTimeout(() => setToastMessage(''), 2500);
-        return;
-      }
-
-      if (!seatMapRef.current || !Array.isArray(seats) || seats.length === 0) {
-        setToastMessage('Nu există o diagramă disponibilă pentru export.');
-        setToastType('error');
-        setTimeout(() => setToastMessage(''), 2500);
-        return;
-      }
-
-      try {
-        setIsExportingSeatMap(true);
-        const canvas = drawSeatMapCanvas();
-        if (!canvas) {
-          throw new Error('Canvas indisponibil');
-        }
-
-        const baseName = vehicleInfo?.name ? `diagrama-${vehicleInfo.name}` : 'diagrama';
-        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `${baseName}-${timestamp}.${format === 'pdf' ? 'pdf' : 'png'}`;
-
-        if (format === 'pdf') {
-          const pdfBlob = canvasToPdfBlob(canvas);
-          const url = URL.createObjectURL(pdfBlob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        } else {
-          const imageUrl = canvas.toDataURL('image/png');
-          const link = document.createElement('a');
-          link.href = imageUrl;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
-      } catch (err) {
-        console.error('Export SeatMap error', err);
-        setToastMessage('Exportul a eșuat. Încearcă din nou.');
-        setToastType('error');
-        setTimeout(() => setToastMessage(''), 3000);
-      } finally {
-        setIsExportingSeatMap(false);
-      }
-    },
-    [drawSeatMapCanvas, seatMapRef, seatViewMode, seats, setToastMessage, setToastType, vehicleInfo]
-  );
 
 
 
@@ -3981,9 +3744,9 @@ export default function ReservationPage({ userRole, user }) {
             <div className="bg-white rounded shadow p-4 flex gap-6 items-start w-fit mx-auto">
               {/* Harta locurilor */}
               <div>
-                <div className="flex flex-wrap items-center gap-3 mb-3">
-                  <div className="font-semibold min-w-[160px]">Selectează locurile:</div>
-                  <div className="inline-flex items-center gap-2 flex-wrap">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <div className="font-semibold">Selectează locurile:</div>
+                  <div className="inline-flex items-center gap-2">
                     <button
                       type="button"
                       onClick={() => {
@@ -4014,52 +3777,6 @@ export default function ReservationPage({ userRole, user }) {
                     >
                       Timeline
                     </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!isGridViewActive) return;
-                        setIsWideView((prev) => !prev);
-                      }}
-                      disabled={!isGridViewActive}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                        isWideView
-                          ? 'bg-blue-600 text-white border-blue-600'
-                          : 'bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200'
-                      } ${!isGridViewActive ? 'opacity-60 cursor-not-allowed' : ''}`}
-                      title="Mărește lățimea locurilor din diagramă pentru a vedea toate detaliile"
-                    >
-                      Vedere largă
-                    </button>
-                  </div>
-                  <div className="inline-flex items-center gap-2 flex-wrap ml-auto">
-                    <button
-                      type="button"
-                      onClick={() => handleSeatMapExport('png')}
-                      disabled={exportButtonsDisabled}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                        exportButtonsDisabled
-                          ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed opacity-70'
-                          : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-100'
-                      }`}
-                      title="Descarcă diagrama în format imagine PNG"
-                      aria-busy={isExportingSeatMap}
-                    >
-                      {isExportingSeatMap ? 'Se pregătește PNG…' : 'Export PNG'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSeatMapExport('pdf')}
-                      disabled={exportButtonsDisabled}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                        exportButtonsDisabled
-                          ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed opacity-70'
-                          : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
-                      }`}
-                      title="Exportă diagrama în format PDF"
-                      aria-busy={isExportingSeatMap}
-                    >
-                      {isExportingSeatMap ? 'Se pregătește PDF…' : 'Export PDF'}
-                    </button>
                   </div>
                 </div>
                 {vehicleInfo && (
@@ -4069,7 +3786,6 @@ export default function ReservationPage({ userRole, user }) {
                 )}
                 {seats.length > 0 && seatViewMode === 'grid' && (
                   <SeatMap
-                    ref={seatMapRef}
                     seats={seats}
                     stops={stops}
                     selectedSeats={selectedSeats}
@@ -4094,7 +3810,6 @@ export default function ReservationPage({ userRole, user }) {
                     vehicleId={
                       tabs.find(tv => tv.trip_vehicle_id === activeTv)?.vehicle_id
                     }
-                    isWideView={isWideView}
                   />
                 )}
 
@@ -5050,85 +4765,4 @@ export default function ReservationPage({ userRole, user }) {
 
     </div>
   );
-}
-
-function canvasToPdfBlob(canvas) {
-  const width = canvas.width;
-  const height = canvas.height;
-  const encoder = new TextEncoder();
-  const chunks = [];
-  let length = 0;
-  const offsets = new Array(6).fill(0);
-
-  const appendBuffer = (buffer) => {
-    chunks.push(buffer);
-    length += buffer.length;
-  };
-
-  const appendString = (value) => {
-    appendBuffer(encoder.encode(value));
-  };
-
-  const beginObject = (id) => {
-    offsets[id] = length;
-    appendString(`${id} 0 obj\n`);
-  };
-
-  const endObject = () => {
-    appendString('endobj\n');
-  };
-
-  const imageData = dataURLToUint8Array(canvas.toDataURL('image/jpeg', 0.95));
-  const contentStream = `q\n${width} 0 0 ${height} 0 0 cm\n/Im0 Do\nQ\n`;
-  const contentLength = encoder.encode(contentStream).length;
-
-  beginObject(1);
-  appendString('<< /Type /Catalog /Pages 2 0 R >>\n');
-  endObject();
-
-  beginObject(2);
-  appendString('<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n');
-  endObject();
-
-  beginObject(3);
-  appendString(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>\n`);
-  endObject();
-
-  beginObject(4);
-  appendString(`<< /Length ${contentLength} >>\nstream\n${contentStream}endstream\n`);
-  endObject();
-
-  beginObject(5);
-  appendString(`<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageData.length} >>\nstream\n`);
-  appendBuffer(imageData);
-  appendString('\nendstream\n');
-  endObject();
-
-  const startXref = length;
-  appendString('xref\n0 6\n');
-  appendString('0000000000 65535 f \n');
-  for (let i = 1; i <= 5; i += 1) {
-    appendString(`${offsets[i].toString().padStart(10, '0')} 00000 n \n`);
-  }
-  appendString('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n');
-  appendString(`${startXref}\n%%EOF`);
-
-  return new Blob(chunks, { type: 'application/pdf' });
-}
-
-function dataURLToUint8Array(dataUrl) {
-  const base64 = dataUrl.split(',')[1];
-  const decode =
-    typeof globalThis !== 'undefined' && typeof globalThis.atob === 'function'
-      ? globalThis.atob
-      : () => {
-          throw new Error('Base64 decoding is not supported in this environment.');
-        };
-  const binaryString = decode(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i += 1) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
 }

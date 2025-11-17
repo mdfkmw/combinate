@@ -1,7 +1,7 @@
 // 📁 components/SeatMap.jsx
-import React, { forwardRef } from 'react';
+import React from 'react';
 
-const SeatMap = forwardRef(function SeatMap({
+export default function SeatMap({
   seats,
   stops,
   selectedSeats,
@@ -24,8 +24,7 @@ const SeatMap = forwardRef(function SeatMap({
   setToastType,
   driverName,
   intentHolds = {},
-  isWideView = false,
-}, ref) {
+}) {
 
 
   /*
@@ -44,19 +43,17 @@ const SeatMap = forwardRef(function SeatMap({
 
 
 
-  const seatWidth = isWideView ? 210 : 105;
-  const maxCol = seats.length > 0 ? Math.max(...seats.map(s => s.seat_col || 1)) : 1;
-  const maxRow = seats.length > 0 ? Math.max(...seats.map(s => s.row || 1)) : 1;
+  const maxCol = Math.max(...seats.map(s => s.seat_col || 1));
+  const maxRow = Math.max(...seats.map(s => s.row || 1));
 
 
 
   return (
     <div
-      ref={ref}
       className="relative mx-auto"
       style={{
         display: "grid",
-        gridTemplateColumns: `repeat(${maxCol}, ${seatWidth}px)`,   // fiecare seat are 105px
+        gridTemplateColumns: `repeat(${maxCol}, 105px)`,   // fiecare seat are 105px
         gridTemplateRows: `repeat(${maxRow + 1}, 100px)`,
         gap: "5px",
         background: "#f3f4f6",
@@ -156,7 +153,7 @@ const SeatMap = forwardRef(function SeatMap({
             style={{
               gridRowStart: seat.row + 1,
               gridColumnStart: seat.seat_col,
-              width: `${seatWidth}px`,
+              width: '105px',
               height: '100px',
             }}
           >
@@ -224,6 +221,4 @@ const SeatMap = forwardRef(function SeatMap({
       })}
     </div>
   );
-});
-
-export default SeatMap;
+}
