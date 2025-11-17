@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { downloadExcel, escapeHtml, formatExportTimestamp } from '../utils/excelExport';
 
 
 const formatValue = (value) => {
@@ -45,6 +46,18 @@ export default function AdminPriceLists() {
   const [importStations, setImportStations] = useState([]);
   const [importLoading, setImportLoading] = useState(false);
   const [isPanelOpen, setIsPanelOpen] = useState(true);
+
+  const selectedRouteName = useMemo(() => {
+    if (!selectedRoute) return '';
+    const found = routes.find((r) => String(r.id) === String(selectedRoute));
+    return found?.name || '';
+  }, [routes, selectedRoute]);
+
+  const selectedCategoryName = useMemo(() => {
+    if (!selectedCategory) return '';
+    const found = categories.find((c) => String(c.id) === String(selectedCategory));
+    return found?.name || '';
+  }, [categories, selectedCategory]);
 
   const nameToId = useMemo(() => {
     const map = new Map();
@@ -481,6 +494,51 @@ const handleCopyReturnToOutbound = () => {
     return '';
   };
 
+  const exportPriceGridToExcel = () => {
+    if (!stations.length) {
+      alert('Nu există stații pentru export.');
+      return;
+    }
+
+    const headerHtml = `
+      <tr>
+        <th>Stație</th>
+        ${stations.map((station) => `<th>${escapeHtml(station)}</th>`).join('')}
+      </tr>
+    `;
+
+    const rowsHtml = stations
+      .map((from, rowIdx) => {
+        const cells = stations
+          .map((to, colIdx) => {
+            if (colIdx === rowIdx) {
+              return '<td style="background:#000;width:28px;height:28px"></td>';
+            }
+            const cell = grid[from]?.[to];
+            const value = colIdx > rowIdx ? cell?.price ?? '' : cell?.r_price ?? '';
+            return `<td style="text-align:center">${escapeHtml(value)}</td>`;
+          })
+          .join('');
+        return `<tr><td>${escapeHtml(from)}</td>${cells}</tr>`;
+      })
+      .join('');
+
+    const headingHtml = `
+      <div style="margin-bottom:12px;font-size:13px;">
+        <div><strong>Rută:</strong> ${escapeHtml(selectedRouteName || selectedRoute || '-')}</div>
+        <div><strong>Categorie:</strong> ${escapeHtml(selectedCategoryName || '-')}</div>
+        <div><strong>Export:</strong> ${escapeHtml(formatExportTimestamp())}</div>
+      </div>
+    `;
+
+    downloadExcel({
+      filenameBase: `preturi-${selectedRouteName || selectedRoute || 'ruta'}-${selectedCategoryName || 'categorie'}`,
+      headingHtml,
+      tableHtml: `<table>${headerHtml}${rowsHtml}</table>`,
+      extraCss: 'th,td{border:1px solid #000;} table{border-collapse:collapse;}',
+    });
+  };
+
   const handleImportPrices = async () => {
     if (!importSelectedVersion) {
       alert('Selectează o versiune pentru import.');
@@ -721,6 +779,14 @@ const handleCopyReturnToOutbound = () => {
             className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded"
           >
             Salvează
+          </button>
+          <button
+            type="button"
+            onClick={exportPriceGridToExcel}
+            disabled={!stations.length}
+            className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            Export Excel
           </button>
         </div>
         </div>

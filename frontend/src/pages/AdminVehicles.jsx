@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
+import { downloadExcel, escapeHtml, formatExportTimestamp } from "../utils/excelExport";
 
 /**
  * AdminVehicles.jsx – complet
@@ -162,6 +163,42 @@ export default function AdminVehicles() {
         } catch (e) { console.error(e); setError("Nu am putut încărca lista de mașini."); }
         finally { setLoadingList(false); }
     }
+
+    const exportVehiclesToExcel = () => {
+        if (!vehicles.length) {
+            alert("Nu există mașini de exportat pentru filtrele curente.");
+            return;
+        }
+
+        const headers = ["Nume", "Nr. înmatr.", "Tip", "Operator", "Locuri"];
+        const rowsHtml = vehicles.map((v) => {
+            const operatorName = v.operator_name
+                ?? (operators.find((op) => op.id === v.operator_id)?.name)
+                ?? "";
+            const cells = [
+                v.name ?? "",
+                v.plate_number ?? "",
+                v.type ?? "",
+                operatorName,
+                v.seat_count ?? "",
+            ];
+            return `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+        }).join("");
+
+        const headingHtml = `
+            <div style="margin-bottom:12px;font-size:13px;">
+                <div><strong>Export mașini:</strong> ${escapeHtml(formatExportTimestamp())}</div>
+                ${operatorFilter ? `<div><strong>Operator filtrat:</strong> ${escapeHtml(operators.find((op) => String(op.id) === String(operatorFilter))?.name || operatorFilter)}</div>` : ""}
+                ${typeFilter ? `<div><strong>Tip filtrat:</strong> ${escapeHtml(typeFilter)}</div>` : ""}
+            </div>
+        `;
+
+        downloadExcel({
+            filenameBase: "administrare-masini",
+            headingHtml,
+            tableHtml: `<table><tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join("")}</tr>${rowsHtml}</table>`,
+        });
+    };
     async function openEditor(id) {
         setSelectedId(id); setVehicle(null); setSeats([]); setExtraRows(0);
         setExtraCols(0);
@@ -367,6 +404,13 @@ export default function AdminVehicles() {
                         </Select>
                     </Field>
                     <button className="ml-auto rounded-xl bg-gray-100 hover:bg-gray-200 px-4 py-2" onClick={loadVehicles}>Reîncarcă</button>
+                    <button
+                        className="rounded-xl bg-emerald-600 text-white px-4 py-2 hover:bg-emerald-700 disabled:opacity-60 disabled:cursor-not-allowed"
+                        onClick={exportVehiclesToExcel}
+                        disabled={!vehicles.length}
+                    >
+                        Export Excel
+                    </button>
                     <button className="rounded-xl bg-blue-600 text-white px-4 py-2 hover:bg-blue-700" onClick={() => setShowAddVehicle(true)}>Adaugă mașină</button>
                 </div>
 
