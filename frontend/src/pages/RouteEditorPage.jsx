@@ -207,6 +207,7 @@ export default function RouteEditorPage() {
   const [saving, setSaving]           = useState(false);
   const [search, setSearch]           = useState("");
   const [expandedStops, setExpandedStops] = useState(() => new Set());
+  const [routeInfo, setRouteInfo]     = useState(null);
 
   const [mode, setMode] = useState("idle"); // "idle" | "drawCircle" | "drawPolygon" | "setPublicTur" | "setPublicRetur"
   const [previewPts, setPreviewPts] = useState([]);
@@ -230,6 +231,7 @@ export default function RouteEditorPage() {
     setMode("idle");
     setPreviewPts([]);
     didFitOnce.current = false;
+    setRouteInfo(null);
 
     (async () => {
       try {
@@ -272,6 +274,20 @@ export default function RouteEditorPage() {
       } catch (err) {
         if (axios.isCancel?.(err) || err?.name === "CanceledError") return;
         console.error("Fetch route failed", err);
+        return;
+      }
+
+      try {
+        const routesRes = await axios.get("/api/routes", {
+          signal: controller.signal,
+          headers: { "Cache-Control": "no-cache" },
+        });
+        if (cancelled) return;
+        const match = (routesRes.data ?? []).find((rt) => Number(rt.id) === Number(routeId));
+        setRouteInfo(match || null);
+      } catch (err) {
+        if (axios.isCancel?.(err) || err?.name === "CanceledError") return;
+        console.warn("Nu am putut încărca informațiile rutei", err);
       }
     })();
 
@@ -293,6 +309,81 @@ export default function RouteEditorPage() {
     setStops(list.map((s,k)=>({ ...s, sequence:k+1 })));
   };
   const onDrop = () => setDragIdx(null);
+
+  const sanitizeForFile = (text) => {
+    if (!text) return "";
+    return String(text).replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
+  };
+
+  const exportStopsToExcel = useCallback(() => {
+    if (!stops.length) return;
+    const headers = [
+      "#",
+      "Stație",
+      "ID stație",
+      "Distanță km",
+      "Timp min",
+      "Rază m",
+      "Latitudine",
+      "Longitudine",
+      "Tip geofence",
+      "Public (tur) - detaliu",
+      "Public (tur) - lat",
+      "Public (tur) - lng",
+      "Public (retur) - detaliu",
+      "Public (retur) - lat",
+      "Public (retur) - lng",
+    ];
+
+    const escapeHtml = (value) => {
+      if (value === null || value === undefined) return "";
+      return String(value)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    };
+
+    const rowsHtml = stops.map((stop, idx) => {
+      const cells = [
+        idx + 1,
+        stop.name ?? "",
+        stop.station_id ?? "",
+        stop.distance_km ?? "",
+        stop.duration_min ?? "",
+        stop.geofence_radius_m ?? "",
+        stop.latitude ?? "",
+        stop.longitude ?? "",
+        stop.geofence_type ?? "",
+        stop.public_note_tur ?? "",
+        stop.public_latitude_tur ?? "",
+        stop.public_longitude_tur ?? "",
+        stop.public_note_retur ?? "",
+        stop.public_latitude_retur ?? "",
+        stop.public_longitude_retur ?? "",
+      ];
+      return `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+    }).join("");
+
+    const headerHtml = `<tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join("")}</tr>`;
+
+    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}th,td{border:1px solid #d1d5db;padding:4px 6px;text-align:left;}th{background:#f1f5f9;}</style></head><body><table>${headerHtml}${rowsHtml}</table></body></html>`;
+
+    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    const now = new Date();
+    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
+    const routeName = sanitizeForFile(routeInfo?.name || `ruta-${routeId}`) || `ruta-${routeId}`;
+    a.href = url;
+    a.download = `statii-${routeName}-${stamp}.xls`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }, [stops, routeInfo?.name, routeId]);
+
+  const routeLabel = routeInfo?.name?.trim() ? routeInfo.name : `ruta #${routeId}`;
 
   /* ---------------------- helpers ---------------------- */
   const EPS = 1e-6;
@@ -596,9 +687,19 @@ export default function RouteEditorPage() {
     <div className="flex min-h-screen">
       {/* ########## SIDEBAR ########## */}
       <aside className="w-80 border-r p-4 h-screen overflow-y-auto">
-        <div className="flex items-baseline justify-between mb-2">
-          <h1 className="font-semibold text-lg">Stații traseu</h1>
-          <span className="text-xs text-gray-500">ruta #{routeId}</span>
+        <div className="flex items-start justify-between mb-2 gap-3">
+          <div>
+            <h1 className="font-semibold text-lg">Stații traseu</h1>
+            <span className="text-xs text-gray-500">{routeLabel}</span>
+          </div>
+          <button
+            type="button"
+            className="text-xs border rounded px-2 py-1 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={exportStopsToExcel}
+            disabled={!stops.length}
+          >
+            Export
+          </button>
         </div>
 
         {stops.map((s, idx) => {
