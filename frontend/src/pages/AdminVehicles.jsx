@@ -186,11 +186,14 @@ export default function AdminVehicles() {
         }).join("");
 
         const headingHtml = `
-            <div style="margin-bottom:12px;font-size:12px;">
-                <div><strong>Export mașini:</strong> ${escapeHtml(formatExportTimestamp())}</div>
-                ${operatorFilter ? `<div><strong>Operator filtrat:</strong> ${escapeHtml(operators.find((op) => String(op.id) === String(operatorFilter))?.name || operatorFilter)}</div>` : ""}
-                ${typeFilter ? `<div><strong>Tip filtrat:</strong> ${escapeHtml(typeFilter)}</div>` : ""}
-            </div>
+            <table style="margin-bottom:12px;width:auto;">
+                <tr>
+                    <td>Export mașini</td>
+                    <td>${escapeHtml(formatExportTimestamp())}</td>
+                </tr>
+                ${operatorFilter ? `<tr><td>Operator filtrat</td><td>${escapeHtml(operators.find((op) => String(op.id) === String(operatorFilter))?.name || operatorFilter)}</td></tr>` : ""}
+                ${typeFilter ? `<tr><td>Tip filtrat</td><td>${escapeHtml(typeFilter)}</td></tr>` : ""}
+            </table>
         `;
 
         downloadExcel({
