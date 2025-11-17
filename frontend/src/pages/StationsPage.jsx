@@ -4,9 +4,10 @@
 // IMPORTANT: Încarcă Google Maps JS O SINGURĂ DATĂ în aplicație (ex. într-un MapProvider la root)
 // sau asigură-te că ORICE alt apel useJsApiLoader folosește exact aceleași opțiuni (id + libraries).
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import axios from "axios";
 import { GoogleMap } from "@react-google-maps/api";
+import { downloadExcel, escapeHtml, formatExportTimestamp } from "../utils/excelExport";
 
 // --- CONFIG ---
 const GMAPS_KEY = import.meta.env.VITE_GMAPS_KEY;
@@ -130,6 +131,55 @@ export default function StationsPage() {
     });
   })();
 
+  const exportStationsToExcel = useCallback(() => {
+    if (!stations.length) {
+      alert("Nu există stații de exportat.");
+      return;
+    }
+
+    const headers = [
+      "#",
+      "ID",
+      "Nume",
+      "Localitate",
+      "Județ",
+      "Latitudine",
+      "Longitudine",
+      "Creat la",
+      "Actualizat la",
+    ];
+
+    const rowsHtml = stations
+      .map((st, idx) => {
+        const cells = [
+          idx + 1,
+          st.id ?? "",
+          st.name ?? "",
+          st.locality ?? "",
+          st.county ?? "",
+          st.latitude ?? "",
+          st.longitude ?? "",
+          st.created_at ?? "",
+          st.updated_at ?? "",
+        ];
+        return `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join("")}</tr>`;
+      })
+      .join("");
+
+    const headerHtml = `<tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join("")}</tr>`;
+    const headingHtml = `
+      <div style="margin-bottom:12px;font-size:13px;">
+        <div><strong>Export stații:</strong> ${escapeHtml(formatExportTimestamp())}</div>
+      </div>
+    `;
+
+    downloadExcel({
+      filenameBase: "administrare-statii",
+      headingHtml,
+      tableHtml: `<table>${headerHtml}${rowsHtml}</table>`,
+    });
+  }, [stations]);
+
   const renderSortHeader = (field, label) => {
     const isActive = sortState.field === field;
     const indicator = isActive ? (sortState.direction === "asc" ? "↑" : "↓") : "↕";
@@ -177,7 +227,7 @@ export default function StationsPage() {
         </label>
       </div>
 
-      <div className="mb-4">
+      <div className="mb-4 flex flex-wrap gap-2">
         <button
           onClick={() =>
             setEditing({
@@ -192,6 +242,14 @@ export default function StationsPage() {
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
           + Adaugă stație
+        </button>
+        <button
+          type="button"
+          onClick={exportStationsToExcel}
+          disabled={!stations.length}
+          className="bg-emerald-600 text-white px-4 py-2 rounded disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Export Excel
         </button>
       </div>
 

@@ -7,6 +7,7 @@ import { useParams } from "react-router-dom";
 import axios from "axios";
 import { GoogleMap, Polyline, Polygon, Circle } from "@react-google-maps/api";
 import { Trash2, X, ChevronDown, ChevronRight } from "lucide-react";
+import { downloadExcel, escapeHtml, formatExportTimestamp } from "../utils/excelExport";
 
 
 /* ------------ CONFIG ------------ */
@@ -315,6 +316,8 @@ export default function RouteEditorPage() {
     return String(text).replace(/[\\/:*?"<>|]/g, "_").slice(0, 80);
   };
 
+  const routeLabel = routeInfo?.name?.trim() ? routeInfo.name : `ruta #${routeId}`;
+
   const exportStopsToExcel = useCallback(() => {
     if (!stops.length) return;
     const headers = [
@@ -366,24 +369,20 @@ export default function RouteEditorPage() {
     }).join("");
 
     const headerHtml = `<tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join("")}</tr>`;
-
-    const html = `<!DOCTYPE html><html><head><meta charset="UTF-8" /><style>table{border-collapse:collapse;font-family:Arial,sans-serif;font-size:12px;}th,td{border:1px solid #d1d5db;padding:4px 6px;text-align:left;}th{background:#f1f5f9;}</style></head><body><table>${headerHtml}${rowsHtml}</table></body></html>`;
-
-    const blob = new Blob([html], { type: "application/vnd.ms-excel" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
     const now = new Date();
-    const stamp = `${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}-${String(now.getHours()).padStart(2, "0")}${String(now.getMinutes()).padStart(2, "0")}`;
-    const routeName = sanitizeForFile(routeInfo?.name || `ruta-${routeId}`) || `ruta-${routeId}`;
-    a.href = url;
-    a.download = `statii-${routeName}-${stamp}.xls`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
-  }, [stops, routeInfo?.name, routeId]);
+    const headingHtml = `
+      <div style="margin-bottom:12px;font-size:13px;">
+        <div><strong>Traseu:</strong> ${escapeHtml(routeLabel)}</div>
+        <div><strong>Export:</strong> ${escapeHtml(formatExportTimestamp(now))}</div>
+      </div>
+    `;
 
-  const routeLabel = routeInfo?.name?.trim() ? routeInfo.name : `ruta #${routeId}`;
+    downloadExcel({
+      filenameBase: `statii-${sanitizeForFile(routeInfo?.name || `ruta-${routeId}`) || `ruta-${routeId}`}`,
+      headingHtml,
+      tableHtml: `<table>${headerHtml}${rowsHtml}</table>`,
+    });
+  }, [stops, routeInfo?.name, routeId, routeLabel]);
 
   /* ---------------------- helpers ---------------------- */
   const EPS = 1e-6;

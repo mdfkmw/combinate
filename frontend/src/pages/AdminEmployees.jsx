@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { downloadExcel, escapeHtml, formatExportTimestamp } from '../utils/excelExport';
 
 export default function AdminEmployees() {
   const [employees, setEmployees] = useState([]);
@@ -216,17 +217,64 @@ export default function AdminEmployees() {
     return sortable;
   }, [employees, sortConfig]);
 
+  const exportEmployeesToExcel = () => {
+    if (!employees.length) {
+      alert('Nu există angajați de exportat.');
+      return;
+    }
+
+    const operatorMap = new Map(operators.map((op) => [op.id, op.name]));
+    const headers = ['#', 'Nume', 'Utilizator', 'Telefon', 'Email', 'Rol', 'Activ', 'Operator'];
+    const rowsHtml = employees
+      .map((emp, idx) => {
+        const cells = [
+          emp.id ?? idx + 1,
+          emp.name ?? '',
+          emp.username ?? '',
+          emp.phone ?? '',
+          emp.email ?? '',
+          emp.role ?? '',
+          emp.active ? 'DA' : 'NU',
+          operatorMap.get(emp.operator_id) ?? '',
+        ];
+        return `<tr>${cells.map((cell) => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>`;
+      })
+      .join('');
+
+    const headingHtml = `
+      <div style="margin-bottom:12px;font-size:13px;">
+        <div><strong>Export angajați:</strong> ${escapeHtml(formatExportTimestamp())}</div>
+      </div>
+    `;
+
+    downloadExcel({
+      filenameBase: 'administrare-angajati',
+      headingHtml,
+      tableHtml: `<table><tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join('')}</tr>${rowsHtml}</table>`,
+    });
+  };
+
   if (loading) return <p>Se încarcă angajații…</p>;
 
   return (
     <div>
       <h2 className="text-lg font-semibold mb-4">Angajați</h2>
-      <button
-        onClick={openNew}
-        className="mb-4 px-3 py-1 text-sm bg-green-600 text-white rounded"
-      >
-        + Adaugă
-      </button>
+      <div className="flex flex-wrap gap-2 mb-4">
+        <button
+          onClick={openNew}
+          className="px-3 py-1 text-sm bg-green-600 text-white rounded"
+        >
+          + Adaugă
+        </button>
+        <button
+          type="button"
+          onClick={exportEmployeesToExcel}
+          disabled={!employees.length}
+          className="px-3 py-1 text-sm bg-emerald-600 text-white rounded disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          Export Excel
+        </button>
+      </div>
 
       <div className="overflow-x-auto">
         <table className="w-auto text-sm table-auto border-collapse">
