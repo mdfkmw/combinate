@@ -4318,7 +4318,7 @@ export default function ReservationPage({ userRole, user }) {
                         </select>
                       </div>
                       <div className="flex items-center gap-2">
-                        <label className="font-medium whitespace-nowrap">Tip reducere:</label>
+                        <label className="font-medium whitespace-nowrap">Tip:</label>
                         <select
                           className="border rounded px-2 py-1 text-sm"
                           style={{ minWidth: 140, maxWidth: 180 }}
@@ -4356,7 +4356,7 @@ export default function ReservationPage({ userRole, user }) {
 
 
 
-                    <div className="flex items-center mb-2">
+                    <div className="mb-2 flex flex-wrap items-end gap-3">
                       <span className="font-medium">
                         Preț:
                         {(() => {
@@ -4396,6 +4396,45 @@ export default function ReservationPage({ userRole, user }) {
                           );
                         })()}
                       </span>
+
+                      {index === 0 && (
+                        <div className="ml-auto flex flex-col items-end gap-1 text-right">
+                          <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                            Cod reducere
+                          </span>
+                          <div className="flex flex-wrap items-center justify-end gap-2">
+                            <input
+                              className="w-40 border border-gray-300 rounded px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
+                              value={promoCode}
+                              onChange={(e) => setPromoCode(e.target.value)}
+                              placeholder="FALL25"
+                            />
+                            <button
+                              type="button"
+                              onClick={handleApplyPromo}
+                              disabled={!promoCode.trim()}
+                              className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                            >
+                              Aplică
+                            </button>
+                          </div>
+                          {promoApplied && (
+                            <div className="flex items-center gap-2 rounded-full bg-green-50 px-3 py-1 text-xs font-semibold text-green-700">
+                              −{promoApplied.discount_amount} lei ({promoApplied.code})
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setPromoApplied(null);
+                                  setPromoCode('');
+                                }}
+                                className="text-[11px] font-normal text-green-600 underline-offset-2 hover:underline"
+                              >
+                                Reset
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )}
 
                     </div>
 
@@ -4522,48 +4561,6 @@ export default function ReservationPage({ userRole, user }) {
 
                   </div>
                 ))}
-
-                {/* Cod reducere */}
-                {selectedSeats.length > 0 && (
-                  <div className="flex flex-col items-end gap-2">
-                    <span className="text-xs font-semibold uppercase tracking-wide text-gray-500">
-                      Cod reducere
-                    </span>
-                    <div className="flex flex-wrap items-center justify-end gap-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <input
-                          className="w-40 border border-gray-300 rounded px-3 py-2 text-sm text-gray-700 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200"
-                          value={promoCode}
-                          onChange={(e) => setPromoCode(e.target.value)}
-                          placeholder="FALL25"
-                        />
-                        <button
-                          type="button"
-                          onClick={handleApplyPromo}
-                          disabled={!promoCode.trim()}
-                          className="rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          Aplică
-                        </button>
-                      </div>
-                      {promoApplied && (
-                        <div className="flex items-center gap-2 rounded-full bg-green-50 px-3 py-1 text-sm font-semibold text-green-700">
-                          −{promoApplied.discount_amount} lei ({promoApplied.code})
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setPromoApplied(null);
-                              setPromoCode('');
-                            }}
-                            className="text-xs font-normal text-green-600 underline-offset-2 hover:underline"
-                          >
-                            Reset
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
 
                 {/* Total de plată */}
                 {selectedSeats.length > 0 && (
