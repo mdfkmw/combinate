@@ -593,9 +593,9 @@ export default function RouteEditorPage() {
 
   /* ==================== RENDER ==================== */
   return (
-    <div className="flex">
+    <div className="flex min-h-screen">
       {/* ########## SIDEBAR ########## */}
-      <aside className="w-80 border-r p-4 overflow-y-auto">
+      <aside className="w-80 border-r p-4 h-screen overflow-y-auto">
         <div className="flex items-baseline justify-between mb-2">
           <h1 className="font-semibold text-lg">Stații traseu</h1>
           <span className="text-xs text-gray-500">ruta #{routeId}</span>
@@ -851,7 +851,7 @@ export default function RouteEditorPage() {
       </aside>
 
       {/* ########## MAP ########## */}
-      <main className="flex-1 relative">
+      <main className="flex-1 relative min-h-screen">
         {modeHint && (
           <div className="absolute top-4 left-1/2 z-20 -translate-x-1/2 bg-white/95 text-gray-800 px-3 py-1.5 rounded shadow pointer-events-none text-sm">
             {modeHint}

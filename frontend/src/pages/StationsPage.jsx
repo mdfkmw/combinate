@@ -177,6 +177,24 @@ export default function StationsPage() {
         </label>
       </div>
 
+      <div className="mb-4">
+        <button
+          onClick={() =>
+            setEditing({
+              id: null,
+              name: "",
+              locality: "",
+              county: "",
+              latitude: 47,
+              longitude: 26,
+            })
+          }
+          className="bg-blue-600 text-white px-4 py-2 rounded"
+        >
+          + Adaugă stație
+        </button>
+      </div>
+
       <table className="w-full border text-sm">
         <thead className="bg-gray-100">
           <tr>
@@ -217,22 +235,6 @@ export default function StationsPage() {
             ))}
         </tbody>
       </table>
-
-      <button
-        onClick={() =>
-          setEditing({
-            id: null,
-            name: "",
-            locality: "",
-            county: "",
-            latitude: null,
-            longitude: null,
-          })
-        }
-        className="mt-4 bg-blue-600 text-white px-4 py-2 rounded"
-      >
-        + Adaugă stație
-      </button>
 
       {editing && (
         <EditStationModal
