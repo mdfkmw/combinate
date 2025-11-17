@@ -512,7 +512,7 @@ const handleCopyReturnToOutbound = () => {
         const cells = stations
           .map((to, colIdx) => {
             if (colIdx === rowIdx) {
-              return '<td style="background:#000;width:28px;height:28px"></td>';
+              return '<td class="price-grid-diagonal"></td>';
             }
             const cell = grid[from]?.[to];
             const value = colIdx > rowIdx ? cell?.price ?? '' : cell?.r_price ?? '';
@@ -524,7 +524,7 @@ const handleCopyReturnToOutbound = () => {
       .join('');
 
     const headingHtml = `
-      <div style="margin-bottom:12px;font-size:13px;">
+      <div style="margin-bottom:12px;font-size:12px;">
         <div><strong>Rută:</strong> ${escapeHtml(selectedRouteName || selectedRoute || '-')}</div>
         <div><strong>Categorie:</strong> ${escapeHtml(selectedCategoryName || '-')}</div>
         <div><strong>Export:</strong> ${escapeHtml(formatExportTimestamp())}</div>
@@ -534,8 +534,12 @@ const handleCopyReturnToOutbound = () => {
     downloadExcel({
       filenameBase: `preturi-${selectedRouteName || selectedRoute || 'ruta'}-${selectedCategoryName || 'categorie'}`,
       headingHtml,
-      tableHtml: `<table>${headerHtml}${rowsHtml}</table>`,
-      extraCss: 'th,td{border:1px solid #000;} table{border-collapse:collapse;}',
+      tableHtml: `<table class="price-grid-table">${headerHtml}${rowsHtml}</table>`,
+      extraCss:
+        '.price-grid-table{border-collapse:collapse;table-layout:fixed;}' +
+        '.price-grid-table th,.price-grid-table td{border:1px solid #000;padding:4px 6px;width:20ch;min-width:20ch;white-space:nowrap;}' +
+        '.price-grid-table td{height:auto;vertical-align:middle;}' +
+        '.price-grid-table .price-grid-diagonal{background:#000;color:#000;}',
     });
   };
 

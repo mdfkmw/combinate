@@ -168,7 +168,7 @@ export default function StationsPage() {
 
     const headerHtml = `<tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join("")}</tr>`;
     const headingHtml = `
-      <div style="margin-bottom:12px;font-size:13px;">
+      <div style="margin-bottom:12px;font-size:12px;">
         <div><strong>Export stații:</strong> ${escapeHtml(formatExportTimestamp())}</div>
       </div>
     `;

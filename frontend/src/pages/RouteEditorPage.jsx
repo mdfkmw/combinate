@@ -371,7 +371,7 @@ export default function RouteEditorPage() {
     const headerHtml = `<tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join("")}</tr>`;
     const now = new Date();
     const headingHtml = `
-      <div style="margin-bottom:12px;font-size:13px;">
+      <div style="margin-bottom:12px;font-size:12px;">
         <div><strong>Traseu:</strong> ${escapeHtml(routeLabel)}</div>
         <div><strong>Export:</strong> ${escapeHtml(formatExportTimestamp(now))}</div>
       </div>
