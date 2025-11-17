@@ -838,7 +838,7 @@ export default function ReservationPage({ userRole, user }) {
   }, [intentHolds, isWideView, moveSourceSeat, seats, selectedSeats]);
 
   const handleSeatMapExport = useCallback(
-    async (format = 'png') => {
+    async () => {
       if (seatViewMode !== 'grid') {
         setToastMessage('Exportul este disponibil doar în diagrama clasică.');
         setToastType('warning');
@@ -862,27 +862,14 @@ export default function ReservationPage({ userRole, user }) {
 
         const baseName = vehicleInfo?.name ? `diagrama-${vehicleInfo.name}` : 'diagrama';
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-        const fileName = `${baseName}-${timestamp}.${format === 'pdf' ? 'pdf' : 'png'}`;
-
-        if (format === 'pdf') {
-          const pdfBlob = canvasToPdfBlob(canvas);
-          const url = URL.createObjectURL(pdfBlob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-        } else {
-          const imageUrl = canvas.toDataURL('image/png');
-          const link = document.createElement('a');
-          link.href = imageUrl;
-          link.download = fileName;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-        }
+        const fileName = `${baseName}-${timestamp}.png`;
+        const imageUrl = canvas.toDataURL('image/png');
+        const link = document.createElement('a');
+        link.href = imageUrl;
+        link.download = fileName;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
       } catch (err) {
         console.error('Export SeatMap error', err);
         setToastMessage('Exportul a eșuat. Încearcă din nou.');
@@ -3942,17 +3929,30 @@ export default function ReservationPage({ userRole, user }) {
                     >
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
-                        className="w-6 h-6"
+                        className="w-7 h-7"
+                        viewBox="0 0 36 36"
                         fill="none"
-                        viewBox="0 0 24 24"
                         stroke="currentColor"
+                        strokeWidth={1.8}
                       >
                         <path
+                          d="M6 6v6m-3-3h6"
                           strokeLinecap="round"
                           strokeLinejoin="round"
-                          strokeWidth={2}
-                          d="M12 4v16m8-8H4"
                         />
+                        <path
+                          d="M12 12.5h18a3 3 0 0 1 3 3v8.5a2 2 0 0 1-2 2h-1v1.5a1.5 1.5 0 0 1-1.5 1.5H27"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M12 24.5h-1.5A2.5 2.5 0 0 1 8 22v-9a3 3 0 0 1 3-3h1"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M15 14h6M23 14h4" strokeLinecap="round" />
+                        <circle cx="16" cy="27" r="2" fill="currentColor" stroke="none" />
+                        <circle cx="26" cy="27" r="2" fill="currentColor" stroke="none" />
                       </svg>
                     </button>
                   </div>
@@ -4034,7 +4034,7 @@ export default function ReservationPage({ userRole, user }) {
                   <div className="inline-flex items-center gap-2 flex-wrap ml-auto">
                     <button
                       type="button"
-                      onClick={() => handleSeatMapExport('png')}
+                      onClick={handleSeatMapExport}
                       disabled={exportButtonsDisabled}
                       className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
                         exportButtonsDisabled
@@ -4045,20 +4045,6 @@ export default function ReservationPage({ userRole, user }) {
                       aria-busy={isExportingSeatMap}
                     >
                       {isExportingSeatMap ? 'Se pregătește PNG…' : 'Export PNG'}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleSeatMapExport('pdf')}
-                      disabled={exportButtonsDisabled}
-                      className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
-                        exportButtonsDisabled
-                          ? 'bg-gray-100 text-gray-500 border-gray-200 cursor-not-allowed opacity-70'
-                          : 'bg-blue-50 text-blue-700 border-blue-300 hover:bg-blue-100'
-                      }`}
-                      title="Exportă diagrama în format PDF"
-                      aria-busy={isExportingSeatMap}
-                    >
-                      {isExportingSeatMap ? 'Se pregătește PDF…' : 'Export PDF'}
                     </button>
                   </div>
                 </div>
@@ -4110,10 +4096,31 @@ export default function ReservationPage({ userRole, user }) {
                     <button
                       type="button"
                       onClick={() => handleAutoAddPassengers(1)}
-                      className="w-8 h-8 flex items-center justify-center rounded-full text-white text-lg font-bold transition-colors bg-green-500 hover:bg-green-600"
+                      className="w-10 h-10 flex items-center justify-center rounded-full text-white transition-colors bg-green-500 hover:bg-green-600"
                       title="Adaugă automat un loc"
+                      aria-label="Adaugă automat un loc"
                     >
-                      +
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="w-6 h-6"
+                        viewBox="0 0 32 32"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth={1.8}
+                      >
+                        <path d="M6 6v6m-3-3h6" strokeLinecap="round" strokeLinejoin="round" />
+                        <path
+                          d="M14 7h8a2 2 0 0 1 2 2v8h2.5a1.5 1.5 0 0 1 1.5 1.5v6.5h-2.5"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path
+                          d="M14 7a4 4 0 0 0-4 4v5h-1.5A1.5 1.5 0 0 0 7 17.5V25h3"
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                        />
+                        <path d="M12 16h10v7.5a2.5 2.5 0 0 1-2.5 2.5H13a2 2 0 0 1-2-2v-8" strokeLinecap="round" />
+                      </svg>
                     </button>
                     <button
                       type="button"
@@ -5052,83 +5059,3 @@ export default function ReservationPage({ userRole, user }) {
   );
 }
 
-function canvasToPdfBlob(canvas) {
-  const width = canvas.width;
-  const height = canvas.height;
-  const encoder = new TextEncoder();
-  const chunks = [];
-  let length = 0;
-  const offsets = new Array(6).fill(0);
-
-  const appendBuffer = (buffer) => {
-    chunks.push(buffer);
-    length += buffer.length;
-  };
-
-  const appendString = (value) => {
-    appendBuffer(encoder.encode(value));
-  };
-
-  const beginObject = (id) => {
-    offsets[id] = length;
-    appendString(`${id} 0 obj\n`);
-  };
-
-  const endObject = () => {
-    appendString('endobj\n');
-  };
-
-  const imageData = dataURLToUint8Array(canvas.toDataURL('image/jpeg', 0.95));
-  const contentStream = `q\n${width} 0 0 ${height} 0 0 cm\n/Im0 Do\nQ\n`;
-  const contentLength = encoder.encode(contentStream).length;
-
-  beginObject(1);
-  appendString('<< /Type /Catalog /Pages 2 0 R >>\n');
-  endObject();
-
-  beginObject(2);
-  appendString('<< /Type /Pages /Kids [3 0 R] /Count 1 >>\n');
-  endObject();
-
-  beginObject(3);
-  appendString(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 ${width} ${height}] /Resources << /XObject << /Im0 5 0 R >> >> /Contents 4 0 R >>\n`);
-  endObject();
-
-  beginObject(4);
-  appendString(`<< /Length ${contentLength} >>\nstream\n${contentStream}endstream\n`);
-  endObject();
-
-  beginObject(5);
-  appendString(`<< /Type /XObject /Subtype /Image /Width ${width} /Height ${height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${imageData.length} >>\nstream\n`);
-  appendBuffer(imageData);
-  appendString('\nendstream\n');
-  endObject();
-
-  const startXref = length;
-  appendString('xref\n0 6\n');
-  appendString('0000000000 65535 f \n');
-  for (let i = 1; i <= 5; i += 1) {
-    appendString(`${offsets[i].toString().padStart(10, '0')} 00000 n \n`);
-  }
-  appendString('trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n');
-  appendString(`${startXref}\n%%EOF`);
-
-  return new Blob(chunks, { type: 'application/pdf' });
-}
-
-function dataURLToUint8Array(dataUrl) {
-  const base64 = dataUrl.split(',')[1];
-  const decode =
-    typeof globalThis !== 'undefined' && typeof globalThis.atob === 'function'
-      ? globalThis.atob
-      : () => {
-          throw new Error('Base64 decoding is not supported in this environment.');
-        };
-  const binaryString = decode(base64);
-  const len = binaryString.length;
-  const bytes = new Uint8Array(len);
-  for (let i = 0; i < len; i += 1) {
-    bytes[i] = binaryString.charCodeAt(i);
-  }
-  return bytes;
-}
