@@ -524,11 +524,20 @@ const handleCopyReturnToOutbound = () => {
       .join('');
 
     const headingHtml = `
-      <div style="margin-bottom:12px;font-size:12px;">
-        <div><strong>Rută:</strong> ${escapeHtml(selectedRouteName || selectedRoute || '-')}</div>
-        <div><strong>Categorie:</strong> ${escapeHtml(selectedCategoryName || '-')}</div>
-        <div><strong>Export:</strong> ${escapeHtml(formatExportTimestamp())}</div>
-      </div>
+      <table style="margin-bottom:12px;width:auto;">
+        <tr>
+          <td>Rută</td>
+          <td>${escapeHtml(selectedRouteName || selectedRoute || '-')}</td>
+        </tr>
+        <tr>
+          <td>Categorie</td>
+          <td>${escapeHtml(selectedCategoryName || '-')}</td>
+        </tr>
+        <tr>
+          <td>Export</td>
+          <td>${escapeHtml(formatExportTimestamp())}</td>
+        </tr>
+      </table>
     `;
 
     downloadExcel({

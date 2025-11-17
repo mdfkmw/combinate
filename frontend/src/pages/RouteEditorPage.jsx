@@ -371,10 +371,16 @@ export default function RouteEditorPage() {
     const headerHtml = `<tr>${headers.map((title) => `<th>${escapeHtml(title)}</th>`).join("")}</tr>`;
     const now = new Date();
     const headingHtml = `
-      <div style="margin-bottom:12px;font-size:12px;">
-        <div><strong>Traseu:</strong> ${escapeHtml(routeLabel)}</div>
-        <div><strong>Export:</strong> ${escapeHtml(formatExportTimestamp(now))}</div>
-      </div>
+      <table style="margin-bottom:12px;width:auto;">
+        <tr>
+          <td>Traseu</td>
+          <td>${escapeHtml(routeLabel)}</td>
+        </tr>
+        <tr>
+          <td>Export</td>
+          <td>${escapeHtml(formatExportTimestamp(now))}</td>
+        </tr>
+      </table>
     `;
 
     downloadExcel({
