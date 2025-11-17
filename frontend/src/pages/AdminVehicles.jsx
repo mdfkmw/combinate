@@ -186,7 +186,7 @@ export default function AdminVehicles() {
         }).join("");
 
         const headingHtml = `
-            <div style="margin-bottom:12px;font-size:13px;">
+            <div style="margin-bottom:12px;font-size:12px;">
                 <div><strong>Export mașini:</strong> ${escapeHtml(formatExportTimestamp())}</div>
                 ${operatorFilter ? `<div><strong>Operator filtrat:</strong> ${escapeHtml(operators.find((op) => String(op.id) === String(operatorFilter))?.name || operatorFilter)}</div>` : ""}
                 ${typeFilter ? `<div><strong>Tip filtrat:</strong> ${escapeHtml(typeFilter)}</div>` : ""}

@@ -242,7 +242,7 @@ export default function AdminEmployees() {
       .join('');
 
     const headingHtml = `
-      <div style="margin-bottom:12px;font-size:13px;">
+      <div style="margin-bottom:12px;font-size:12px;">
         <div><strong>Export angajați:</strong> ${escapeHtml(formatExportTimestamp())}</div>
       </div>
     `;
