@@ -135,21 +135,23 @@ router.get('/blacklist/check', async (req, res) => {
 
     // ✅ MODIFICAT: dacă nu există owner ACTIV, căutăm deținătorii PENDING ai aceluiași număr
     if (!person_id) {
-      const [pendingPeople] = await db.query(
+      const pendingPeopleRes = await db.query(
         `SELECT id, name, blacklist
            FROM people
           WHERE phone = ? AND owner_status = 'pending'
           ORDER BY updated_at DESC`,
         [digits]
       );
+      const pendingPeople = pendingPeopleRes.rows || pendingPeopleRes;
       if (Array.isArray(pendingPeople) && pendingPeople.length > 0) {
         const pendingIds = pendingPeople.map(p => p.id);
-        const [pendingNoShows] = await db.query(
+        const pendingNoShowsRes = await db.query(
           `SELECT COUNT(*) AS cnt
              FROM no_shows
             WHERE person_id IN (?)`,
           [pendingIds]
         );
+        const pendingNoShows = pendingNoShowsRes.rows || pendingNoShowsRes;
         const totalNoShows = Number(pendingNoShows?.[0]?.cnt || 0);
         const anyBlacklist = pendingPeople.some(p => Number(p.blacklist) === 1);
         return res.json({
