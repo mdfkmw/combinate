@@ -669,7 +669,7 @@ export default function ReservationPage({ userRole, user }) {
   const [showMoveToOtherTrip, setShowMoveToOtherTrip] = useState(false);
   const [moveToOtherTripData, setMoveToOtherTripData] = useState(null);
 
-  const drawSeatMapCanvas = useCallback(() => {
+  const drawSeatMapCanvas = useCallback((driverName = '') => {
     if (!Array.isArray(seats) || seats.length === 0) {
       return null;
     }
@@ -786,8 +786,8 @@ export default function ReservationPage({ userRole, user }) {
 
       const activePassengers = (seat.passengers || []).filter((p) => !p.status || p.status === 'active');
       const primaryPassenger = activePassengers[0];
-      const seatDisplayLabel = isDriverSeat && currentDriverName ? currentDriverName : seat.label;
-      const driverSubtitle = isDriverSeat && currentDriverName ? 'Șofer' : null;
+      const seatDisplayLabel = isDriverSeat && driverName ? driverName : seat.label;
+      const driverSubtitle = isDriverSeat && driverName ? 'Șofer' : null;
       let textY = y + seatPadding;
       const writeLine = (text, font = '12px "Inter", sans-serif') => {
         if (!text) return;
@@ -849,10 +849,10 @@ export default function ReservationPage({ userRole, user }) {
     });
 
     return canvas;
-  }, [currentDriverName, intentHolds, isWideView, moveSourceSeat, seats, selectedSeats]);
+  }, [intentHolds, isWideView, moveSourceSeat, seats, selectedSeats]);
 
   const handleSeatMapExport = useCallback(
-    async () => {
+    async (driverName = '') => {
       if (seatViewMode !== 'grid') {
         setToastMessage('Exportul este disponibil doar în diagrama clasică.');
         setToastType('warning');
@@ -869,7 +869,7 @@ export default function ReservationPage({ userRole, user }) {
 
       try {
         setIsExportingSeatMap(true);
-        const canvas = drawSeatMapCanvas();
+        const canvas = drawSeatMapCanvas(driverName);
         if (!canvas) {
           throw new Error('Canvas indisponibil');
         }
@@ -4116,7 +4116,7 @@ export default function ReservationPage({ userRole, user }) {
                   <div className="inline-flex items-center gap-2 flex-wrap ml-auto">
                     <button
                       type="button"
-                      onClick={handleSeatMapExport}
+                      onClick={() => handleSeatMapExport(currentDriverName)}
                       disabled={exportButtonsDisabled}
                       className={`px-3 py-1 rounded-full text-xs font-semibold border transition-colors ${
                         exportButtonsDisabled
