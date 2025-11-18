@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 export default function AuditLog() {
   const [rows, setRows] = useState([]);
   const [filters, setFilters] = useState({ from: '', to: '', action: '' });
+  const [stationNames, setStationNames] = useState({});
 
   const parseJson = (value) => {
     if (!value) return null;
@@ -14,8 +15,13 @@ export default function AuditLog() {
     }
   };
 
-  const formatValue = (val) => {
+  const formatValue = (val, key) => {
     if (val === null || val === undefined || val === '') return '—';
+    if (key === 'board_station_id' || key === 'exit_station_id') {
+      const lookupKey = String(val);
+      const stationLabel = stationNames[lookupKey];
+      if (stationLabel) return stationLabel;
+    }
     return val;
   };
 
@@ -39,8 +45,8 @@ export default function AuditLog() {
         const bothMissing = beforeVal === undefined && afterVal === undefined;
         if (bothMissing || beforeVal === afterVal) return null;
 
-        const formattedBefore = formatValue(beforeVal);
-        const formattedAfter = formatValue(afterVal);
+        const formattedBefore = formatValue(beforeVal, key);
+        const formattedAfter = formatValue(afterVal, key);
 
         if (before && after) {
           return `${label}: ${formattedBefore} → ${formattedAfter}`;
@@ -68,6 +74,28 @@ export default function AuditLog() {
   };
 
   useEffect(load, []);
+
+  useEffect(() => {
+    let ignore = false;
+    fetch('/api/stations')
+      .then((r) => r.json())
+      .then((data) => {
+        if (ignore || !Array.isArray(data)) return;
+        const map = {};
+        data.forEach((station) => {
+          const id = station?.id ?? station?.station_id;
+          if (id == null) return;
+          map[String(id)] = station?.name || `Stație #${id}`;
+        });
+        setStationNames(map);
+      })
+      .catch((err) => {
+        console.error('AuditLog: nu am putut încărca stațiile', err);
+      });
+    return () => {
+      ignore = true;
+    };
+  }, []);
 
   return (
     <div className="p-6">

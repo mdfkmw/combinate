@@ -687,8 +687,15 @@ export default function ReservationPage({ userRole, user }) {
     const seatPadding = 10;
     const maxCol = Math.max(...seats.map((s) => s.seat_col || 1));
     const maxRow = Math.max(...seats.map((s) => s.row || 0));
+    const dateLabel = selectedDate ? format(selectedDate, 'dd.MM.yyyy') : '';
+    const routeLabel = selectedRoute?.name || '';
+    const directionLabel = effectiveDirection ? String(effectiveDirection).toUpperCase() : '';
+    const directionAndHour = [directionLabel, selectedHour].filter(Boolean).join(' ');
+    const headerText = [dateLabel, routeLabel, directionAndHour].filter(Boolean).join(', ');
+    const headerHeight = headerText ? 48 : 0;
     const totalWidth = seatWidth * maxCol + seatGap * (maxCol - 1) + padding * 2;
-    const totalHeight = seatHeight * (maxRow + 1) + seatGap * maxRow + padding * 2;
+    const totalHeight = headerHeight + seatHeight * (maxRow + 1) + seatGap * maxRow + padding * 2;
+    const seatAreaTop = padding + headerHeight;
     const canvas = document.createElement('canvas');
     canvas.width = totalWidth;
     canvas.height = totalHeight;
@@ -702,6 +709,12 @@ export default function ReservationPage({ userRole, user }) {
     ctx.fillRect(0, 0, totalWidth, totalHeight);
     ctx.textBaseline = 'top';
     ctx.textAlign = 'left';
+
+    if (headerText) {
+      ctx.fillStyle = '#111827';
+      ctx.font = '600 20px "Inter", sans-serif';
+      ctx.fillText(headerText, padding, padding / 2);
+    }
 
     const selectedSeatIds = new Set(selectedSeats.map((seat) => seat.id));
     const textWidthLimit = seatWidth - seatPadding * 2;
@@ -748,7 +761,7 @@ export default function ReservationPage({ userRole, user }) {
       const col = (seat.seat_col || 1) - 1;
       const row = seat.row || 0;
       const x = padding + col * (seatWidth + seatGap);
-      const y = padding + row * (seatHeight + seatGap);
+      const y = seatAreaTop + row * (seatHeight + seatGap);
       const lowerLabel = (seat.label || '').toLowerCase();
       const isDriverSeat =
         lowerLabel.includes('șofer') ||
@@ -855,7 +868,17 @@ export default function ReservationPage({ userRole, user }) {
     });
 
     return canvas;
-  }, [intentHolds, isWideView, moveSourceSeat, seats, selectedSeats]);
+  }, [
+    effectiveDirection,
+    intentHolds,
+    isWideView,
+    moveSourceSeat,
+    seats,
+    selectedDate,
+    selectedHour,
+    selectedRoute?.name,
+    selectedSeats,
+  ]);
 
   const handleSeatMapExport = useCallback(
     async (driverName = '') => {
