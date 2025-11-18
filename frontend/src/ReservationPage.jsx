@@ -556,11 +556,17 @@ export default function ReservationPage({ userRole, user }) {
         }
 
         const passengers = Array.isArray(item.passengers)
-          ? item.passengers.map((p) => ({
-            ...p,
-            board_at: p.board_at ?? getStationNameById(p.board_station_id),
-            exit_at: p.exit_at ?? getStationNameById(p.exit_station_id),
-          }))
+          ? item.passengers.map((p) => {
+            const numericVersion = Number.isFinite(Number(p?.version))
+              ? Number(p.version)
+              : null;
+            return {
+              ...p,
+              version: numericVersion,
+              board_at: p.board_at ?? getStationNameById(p.board_station_id),
+              exit_at: p.exit_at ?? getStationNameById(p.exit_station_id),
+            };
+          })
           : [];
 
         return { ...item, passengers };
@@ -1806,6 +1812,7 @@ export default function ReservationPage({ userRole, user }) {
         exit_at: passenger.exit_at,
         observations: passenger.observations || '',
         reservation_id: passenger.reservation_id,
+        version: passenger.version ?? null,
       },
     });
 
@@ -2906,7 +2913,7 @@ export default function ReservationPage({ userRole, user }) {
             throw new Error('Stațiile selectate nu sunt valide pentru această rută.');
           }
 
-          return {
+          const passengerPayload = {
             seat_id: seat.id,
             reservation_id: d.reservation_id || null,
             person_id: d.person_id || null,
@@ -2922,6 +2929,16 @@ export default function ReservationPage({ userRole, user }) {
             payment_method: d.payment_method || 'none',
             transaction_id: d.transaction_id || null,
           };
+
+          if (d?.reservation_id) {
+            const version = Number(d.version);
+            if (!Number.isInteger(version)) {
+              throw new Error('Nu am putut încărca versiunea rezervării. Reîncarcă pagina și încearcă din nou.');
+            }
+            passengerPayload.version = version;
+          }
+
+          return passengerPayload;
         });
       } catch (err) {
         setToastMessage(err.message);
@@ -4864,6 +4881,7 @@ export default function ReservationPage({ userRole, user }) {
                 exit_at: popupPassenger.exit_at,
                 observations: popupPassenger.observations || '',
                 reservation_id: popupPassenger.reservation_id || null,
+                version: popupPassenger.version ?? null,
               },
             });
             closePopups();

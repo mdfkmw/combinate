@@ -191,6 +191,7 @@ router.get('/', async (req, res) => {
            r.seat_id,
            r.board_station_id,
            r.exit_station_id,
+           r.version,
            p.name,
            p.phone,
            r.observations,
@@ -228,6 +229,7 @@ router.get('/', async (req, res) => {
         const allPassengers = reservations.map(r => ({
           person_id: r.person_id,
           reservation_id: r.reservation_id,
+          version: r.version,
           name: r.name,
           phone: r.phone,
           board_station_id: r.board_station_id,
@@ -400,6 +402,7 @@ const { rows: reservations } = await db.query(`
     r.seat_id,
     r.board_station_id,
     r.exit_station_id,
+    r.version,
     p.name,
     p.phone,
     r.observations,
