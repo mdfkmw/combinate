@@ -744,7 +744,16 @@ export default function ReservationPage({ userRole, user }) {
       const x = padding + col * (seatWidth + seatGap);
       const y = padding + row * (seatHeight + seatGap);
       const lowerLabel = (seat.label || '').toLowerCase();
-      const isDriverSeat = lowerLabel.includes('șofer') || seat.label === 'Șofer' || seat.label === 'Ghid';
+      const isDriverSeat =
+        lowerLabel.includes('șofer') ||
+        lowerLabel.includes('sofer') ||
+        seat.label === 'Șofer' ||
+        seat.seat_type === 'driver';
+      const isServiceSeat =
+        isDriverSeat ||
+        lowerLabel.includes('ghid') ||
+        seat.label === 'Ghid' ||
+        seat.seat_type === 'guide';
       const status = seat.status;
       const holdInfo = intentHolds?.[seat.id];
       const heldByOther = holdInfo?.isMine === false;
@@ -753,7 +762,7 @@ export default function ReservationPage({ userRole, user }) {
       const isMoveSource = moveSourceSeat?.id === seat.id;
 
       let fillColor = baseColors.available;
-      if (isDriverSeat) {
+      if (isServiceSeat) {
         fillColor = baseColors.driver;
       } else if (status === 'full') {
         fillColor = baseColors.full;
@@ -777,6 +786,8 @@ export default function ReservationPage({ userRole, user }) {
 
       const activePassengers = (seat.passengers || []).filter((p) => !p.status || p.status === 'active');
       const primaryPassenger = activePassengers[0];
+      const seatDisplayLabel = isDriverSeat && currentDriverName ? currentDriverName : seat.label;
+      const driverSubtitle = isDriverSeat && currentDriverName ? 'Șofer' : null;
       let textY = y + seatPadding;
       const writeLine = (text, font = '12px "Inter", sans-serif') => {
         if (!text) return;
@@ -787,7 +798,10 @@ export default function ReservationPage({ userRole, user }) {
         textY += 16;
       };
 
-      writeLine(seat.label, '600 14px "Inter", sans-serif');
+      writeLine(seatDisplayLabel, '600 14px "Inter", sans-serif');
+      if (driverSubtitle) {
+        writeLine(driverSubtitle, '600 12px "Inter", sans-serif');
+      }
       if (primaryPassenger) {
         writeLine(primaryPassenger.name || '(fără nume)', '600 13px "Inter", sans-serif');
         writeLine(primaryPassenger.phone, '12px "Inter", sans-serif');
@@ -835,7 +849,7 @@ export default function ReservationPage({ userRole, user }) {
     });
 
     return canvas;
-  }, [intentHolds, isWideView, moveSourceSeat, seats, selectedSeats]);
+  }, [currentDriverName, intentHolds, isWideView, moveSourceSeat, seats, selectedSeats]);
 
   const handleSeatMapExport = useCallback(
     async () => {
@@ -890,6 +904,74 @@ export default function ReservationPage({ userRole, user }) {
   const [activeTv, setActiveTv] = useState(null);
   const [showAddVeh, setShowAddVeh] = useState(false);
   const [confirmTvToDelete, setConfirmTvToDelete] = useState(null);
+  const [driverAssignments, setDriverAssignments] = useState([]);
+
+  const driverAssignmentsByTripVehicle = useMemo(() => {
+    const map = new Map();
+    driverAssignments.forEach((assignment) => {
+      const id = Number(assignment?.trip_vehicle_id);
+      if (Number.isFinite(id)) {
+        map.set(id, assignment?.employee_name || '');
+      }
+    });
+    return map;
+  }, [driverAssignments]);
+
+  const activeTripVehicleId = useMemo(() => {
+    if (!Array.isArray(tripVehicles) || tripVehicles.length === 0) {
+      return null;
+    }
+    if (activeTv === 'main') {
+      return tripVehicles.find((tv) => tv.is_primary)?.trip_vehicle_id ?? null;
+    }
+    if (activeTv == null) {
+      return null;
+    }
+    const numericId = Number(activeTv);
+    if (!Number.isFinite(numericId)) {
+      return null;
+    }
+    const match = tripVehicles.find((tv) => tv.trip_vehicle_id === numericId);
+    return match?.trip_vehicle_id ?? null;
+  }, [activeTv, tripVehicles]);
+
+  const currentDriverName = activeTripVehicleId
+    ? driverAssignmentsByTripVehicle.get(activeTripVehicleId) || ''
+    : '';
+
+  useEffect(() => {
+    if (!tripId || !selectedDate || !selectedScheduleId) {
+      setDriverAssignments([]);
+      return;
+    }
+
+    const controller = new AbortController();
+    const dateStr = format(selectedDate, 'yyyy-MM-dd');
+    const params = new URLSearchParams({ date: dateStr });
+    const operatorId = selectedSchedule?.operatorId ?? null;
+    if (operatorId) {
+      params.set('operator_id', operatorId);
+    }
+
+    fetch(`/api/trip_assignments?${params}`, { signal: controller.signal })
+      .then((res) => {
+        if (!res.ok) {
+          throw new Error(`HTTP ${res.status}`);
+        }
+        return res.json();
+      })
+      .then((data) => {
+        if (controller.signal.aborted) return;
+        setDriverAssignments(Array.isArray(data) ? data : []);
+      })
+      .catch((err) => {
+        if (err?.name === 'AbortError') return;
+        console.error('Eroare la încărcarea asignărilor de șoferi', err);
+        setDriverAssignments([]);
+      });
+
+    return () => controller.abort();
+  }, [selectedDate, selectedScheduleId, selectedSchedule?.operatorId, tripId]);
 
 
 
@@ -4076,6 +4158,7 @@ export default function ReservationPage({ userRole, user }) {
                     selectedRoute={selectedRoute}
                     setToastMessage={setToastMessage}
                     setToastType={setToastType}
+                    driverName={currentDriverName}
                     intentHolds={intentHolds}
                     vehicleId={
                       tabs.find(tv => tv.trip_vehicle_id === activeTv)?.vehicle_id
