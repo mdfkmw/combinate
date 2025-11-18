@@ -22,7 +22,7 @@ const SeatMap = forwardRef(function SeatMap({
   selectedRoute,
   setToastMessage,
   setToastType,
-  driverName,
+  driverName = '',
   intentHolds = {},
   isWideView = false,
 }, ref) {
@@ -75,15 +75,22 @@ const SeatMap = forwardRef(function SeatMap({
 
 
 
+        const normalizedLabel = String(seat.label || '').toLowerCase();
         const isSelected = selectedSeats.find((s) => s.id === seat.id);
-        const isDriver = seat.label.toLowerCase().includes('șofer');
+        const isDriver =
+          normalizedLabel.includes('șofer') ||
+          normalizedLabel.includes('sofer') ||
+          seat.seat_type === 'driver';
+        const isGuide = normalizedLabel.includes('ghid') || seat.seat_type === 'guide';
+        const isServiceSeat = isDriver || isGuide;
         const status = seat.status; // 'free', 'partial', 'full'
         const holdInfo = intentHolds?.[seat.id];
         const heldByOther = holdInfo?.isMine === false;
         const heldByMe = holdInfo?.isMine === true;
+        const seatTitle = isDriver && driverName ? driverName : seat.label;
 
         let baseColorClass;
-        if (seat.label === 'Șofer' || seat.label === 'Ghid' || isDriver) {
+        if (isServiceSeat) {
           baseColorClass = 'bg-gray-600 cursor-not-allowed';
         } else if (status === 'full') {
           baseColorClass = 'bg-red-600 cursor-not-allowed';
@@ -109,7 +116,7 @@ const SeatMap = forwardRef(function SeatMap({
             key={seat.id}
             data-seat-id={seat.id}
             onClick={(e) => {
-              if (seat.label.toLowerCase().includes('șofer')) return;
+              if (isDriver) return;
 
               if (heldByOther) {
                 setToastMessage('Locul e în curs de rezervare de alt agent');
@@ -161,11 +168,17 @@ const SeatMap = forwardRef(function SeatMap({
             }}
           >
             <div className="flex justify-between font-semibold text-[13px] leading-tight mb-1">
-              <span>{seat.label}</span>
+              <span className="truncate">{seatTitle}</span>
               {activePassengers[0] && (
                 <span className="truncate">{activePassengers[0].name || '(fără nume)'}</span>
               )}
             </div>
+
+            {isDriver && driverName && (
+              <div className="text-[11px] uppercase tracking-wide text-white/80 -mt-1 mb-1">
+                Șofer
+              </div>
+            )}
 
             {activePassengers[0] && (
               <div className="text-[11px] leading-tight">
@@ -203,12 +216,6 @@ const SeatMap = forwardRef(function SeatMap({
                     <div className="italic">{p.board_at} → {p.exit_at}</div>
                   </div>
                 ))}
-              </div>
-            )}
-
-            {isDriver && driverName && (
-              <div className="text-xs text-center mt-1 text-gray-600">
-                {driverName}
               </div>
             )}
 
