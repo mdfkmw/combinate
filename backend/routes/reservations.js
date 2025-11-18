@@ -170,6 +170,17 @@ async function logEvent(reservationId, action, actorId, details = null) {
     const transaction_id = details?.transaction_id || null;
     const related_id = details?.from_reservation_id || details?.related_reservation_id || null;
     const note = details?.note || null;
+    const serialize = (payload) => {
+      if (!payload) return null;
+      if (typeof payload === 'string') return payload;
+      try {
+        return JSON.stringify(payload);
+      } catch {
+        return null;
+      }
+    };
+    const before_json = serialize(details?.before);
+    const after_json = serialize(details?.after);
 
 
     let entity = 'reservation';
@@ -186,7 +197,7 @@ async function logEvent(reservationId, action, actorId, details = null) {
       INSERT INTO audit_logs
         (created_at, actor_id, entity, entity_id, action, related_entity, related_id,
          correlation_id, channel, amount, payment_method, transaction_id, note, before_json, after_json)
-      VALUES (NOW(), ?, ?, ?, ?, 'reservation', ?, ?, ?, ?, ?, ?, ?, NULL, NULL)
+      VALUES (NOW(), ?, ?, ?, ?, 'reservation', ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         actorId || null,
@@ -199,7 +210,9 @@ async function logEvent(reservationId, action, actorId, details = null) {
         amount,
         payment_method,
         transaction_id,
-        note
+        note,
+        before_json,
+        after_json
       ]
     );
   } catch (e) {
@@ -748,9 +761,19 @@ router.post('/', async (req, res) => {
       let existingReservation = null;
       if (p.reservation_id) {
         const existingRes = await db.query(
-          `SELECT id, person_id, trip_id, seat_id, board_station_id, exit_station_id, version
-             FROM reservations
-            WHERE id = ?
+          `SELECT r.id,
+                  r.person_id,
+                  r.trip_id,
+                  r.seat_id,
+                  r.board_station_id,
+                  r.exit_station_id,
+                  r.version,
+                  r.observations,
+                  p.name  AS person_name,
+                  p.phone AS person_phone
+             FROM reservations r
+        LEFT JOIN people p ON p.id = r.person_id
+            WHERE r.id = ?
             LIMIT 1`,
           [p.reservation_id]
         );
@@ -826,6 +849,26 @@ router.post('/', async (req, res) => {
           board_station_id: boardStationId,
           exit_station_id: exitStationId,
           version: newVersion,
+          before: existingReservation
+            ? {
+                person_id: existingReservation.person_id,
+                name: existingReservation.person_name || null,
+                phone: existingReservation.person_phone || null,
+                seat_id: existingReservation.seat_id,
+                board_station_id: existingReservation.board_station_id,
+                exit_station_id: existingReservation.exit_station_id,
+                observations: existingReservation.observations || null,
+              }
+            : null,
+          after: {
+            person_id,
+            name,
+            phone,
+            seat_id: seatId,
+            board_station_id: boardStationId,
+            exit_station_id: exitStationId,
+            observations: p.observations || null,
+          },
         });
 
         await db.query(
