@@ -1,4 +1,5 @@
 const express = require('express');
+const db = require('../db');
 
 const router = express.Router();
 
@@ -6,6 +7,18 @@ const listeners = new Set();
 let lastCall = null;
 let sequence = 0;
 let secretWarningLogged = false;
+const MAX_HISTORY = 500;
+const callHistory = [];
+
+const STATUS_LABELS = new Set(['ringing', 'answered', 'missed', 'rejected']);
+
+function normalizeStatus(rawStatus) {
+  if (!rawStatus) return 'ringing';
+  const status = String(rawStatus).trim().toLowerCase();
+  if (STATUS_LABELS.has(status)) return status;
+  if (status === 'no_answer' || status === 'noanswer') return 'missed';
+  return 'ringing';
+}
 
 function sanitizePhone(rawValue) {
   if (rawValue == null) {
@@ -50,6 +63,13 @@ function cleanupListener(listener) {
   listeners.delete(listener);
 }
 
+function storeInHistory(entry) {
+  callHistory.unshift(entry);
+  if (callHistory.length > MAX_HISTORY) {
+    callHistory.pop();
+  }
+}
+
 router.post('/', (req, res) => {
   const expectedSecret = process.env.PBX_WEBHOOK_SECRET;
   const providedSecret = req.get('x-pbx-secret') || req.body?.secret || req.query?.secret;
@@ -81,8 +101,21 @@ router.post('/', (req, res) => {
     received_at: new Date().toISOString(),
   };
 
-  lastCall = event;
-  broadcast(event);
+  const status = normalizeStatus(req.body?.status);
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim() : null;
+  const entry = {
+    ...event,
+    status,
+    note: note || null,
+    meta: {
+      callerName: typeof req.body?.name === 'string' ? req.body.name.trim() || null : null,
+      personId: req.body?.person_id ?? null,
+    },
+  };
+
+  storeInHistory(entry);
+  lastCall = entry;
+  broadcast(entry);
 
   return res.json({ success: true });
 });
@@ -130,6 +163,57 @@ router.get('/last', (req, res) => {
     return res.status(401).json({ error: 'auth required' });
   }
   res.json({ call: lastCall });
+});
+
+router.get('/log', async (req, res) => {
+  if (!req.user) {
+    return res.status(401).json({ error: 'auth required' });
+  }
+
+  const limit = Math.max(1, Math.min(Number.parseInt(req.query?.limit, 10) || 100, MAX_HISTORY));
+  const slice = callHistory.slice(0, limit);
+  const digits = Array.from(new Set(slice.map((entry) => entry.digits).filter(Boolean)));
+
+  let peopleByPhone = {};
+  if (digits.length) {
+    try {
+      const placeholders = digits.map(() => '?').join(',');
+      const rowsRes = await db.query(
+        `SELECT id, name, phone FROM people WHERE phone IN (${placeholders})`,
+        digits,
+      );
+      for (const row of rowsRes.rows || []) {
+        if (!row) continue;
+        const key = row.phone ? String(row.phone).trim() : null;
+        if (!key || key === '') continue;
+        if (Object.prototype.hasOwnProperty.call(peopleByPhone, key)) continue;
+        peopleByPhone[key] = {
+          id: row.id,
+          name: row.name,
+        };
+      }
+    } catch (err) {
+      console.error('[incoming-calls] Nu am putut încărca numele persoanelor:', err);
+    }
+  }
+
+  const entries = slice.map((entry) => {
+    const person = entry.digits ? peopleByPhone[entry.digits] : null;
+    return {
+      id: entry.id,
+      phone: entry.phone,
+      digits: entry.digits,
+      received_at: entry.received_at,
+      extension: entry.extension,
+      source: entry.source,
+      status: entry.status,
+      note: entry.note,
+      caller_name: entry.meta?.callerName || person?.name || null,
+      person_id: entry.meta?.personId || person?.id || null,
+    };
+  });
+
+  res.json({ entries });
 });
 
 module.exports = router;
